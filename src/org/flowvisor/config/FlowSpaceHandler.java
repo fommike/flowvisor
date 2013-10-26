@@ -43,7 +43,8 @@ public class FlowSpaceHandler extends ConcurrentHashMap<Integer, List<FlowEntry>
 					Entry<Integer, List<FlowEntry>> entry = it.next();
 					for (FlowEntry fentry : entry.getValue()) {
 						try {
-							FlowSpaceImpl.getProxy().addRule(fentry);
+							//FlowSpaceImpl.getProxy().addRule(fentry);
+							FlowSpaceImpl.getProxy().mongoAddRule(fentry);
 							flowSpace.addRule(fentry);
 							String logMsg = "User " + APIUserCred.getUserName() + 
 									flowspaceAddChangeLogMessage(fentry.getDpid(), 
@@ -67,7 +68,6 @@ public class FlowSpaceHandler extends ConcurrentHashMap<Integer, List<FlowEntry>
 				break;
 			}
 		}
-		
 	}
 	
 	public Integer add(List<FlowEntry> fes) {
@@ -93,8 +93,10 @@ public class FlowSpaceHandler extends ConcurrentHashMap<Integer, List<FlowEntry>
 	}
 	
 	private FlowMap getFlowMap() {
-		if (flowSpace == null)
-			flowSpace = FVConfig.getFlowSpaceFlowMap();
+		if (flowSpace == null) {
+			//flowSpace = FVConfig.getFlowSpaceFlowMap();
+			flowSpace = FVConfig.mongoGetFlowSpaceFlowMap();
+		}
 		return flowSpace; 
 			
 	}

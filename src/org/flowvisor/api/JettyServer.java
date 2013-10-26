@@ -157,7 +157,7 @@ public class JettyServer implements Runnable{
 
 		if(port == -1){
 			try {
-				port = FVConfig.getJettyPort();
+				port = FVConfig.mongoGetJettyPort(); // GetJettyPort();
 			} catch (ConfigError e) {
 				port = default_jetty_port; // not explicitly configured
 			}

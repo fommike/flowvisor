@@ -28,15 +28,31 @@ public interface Switch extends FVAppConfig {
 	public static String SWITCH = "switches";
 	
 	public String getFloodPerm(Long dpid) throws ConfigError;
-	public Integer getMaxFlowMods(String sliceName, Long dp) throws ConfigError;
-	public Integer getRateLimit(String sliceName, Long dp) throws ConfigError;
+	// Mongo change
+	public String mongoGetFloodPerm(Long dpid) throws ConfigError;
+	
+	public Integer getMaxFlowMods(String sliceName, Long dpid) throws ConfigError;
+	// Mongo change
+	public Integer mongoGetMaxFlowMods(String sliceName, Long dpid) throws ConfigError;
+	
+	public Integer getRateLimit(String sliceName, Long dpid) throws ConfigError;
+	// Mongo change
+	public Integer mongoGetRateLimit(String sliceName, Long dpid) throws ConfigError;
 	
 	public void setFloodPerm(Long dpid, String flood_perm) throws ConfigError;	
-	public void setMaxFlowMods(String sliceName, Long dp, int limit) throws ConfigError;
-	public void setRateLimit(String sliceName, Long dp, int rate) throws ConfigError;
+	//Mongo change
+	public void mongoSetFloodPerm(Long dpid, String flood_perm) throws ConfigError;
 	
+	public void setMaxFlowMods(String sliceName, Long dpid, int limit) throws ConfigError;
+	// Mongo change
+	public void mongoSetMaxFlowMods(String sliceName, Long dpid, int limit) throws ConfigError;
+	
+	public void setRateLimit(String sliceName, Long dpid, int rate) throws ConfigError;
+	// Mongo change
+	public void mongoSetRateLimit(String sliceName, Long dpid, int rate) throws ConfigError;
+	
+	/** Mongo **/
 	public int pushFlowMod(OFFlowMod flowMod, String sliceName, long dpid);
-
 	public void pullFlowMod(int id);
 	
 }

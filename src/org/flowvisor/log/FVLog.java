@@ -59,13 +59,12 @@ public class FVLog {
 		boolean needConfigFlush = false;
 		try {
 			if (threshold == null)
-				threshold = LogLevel.valueOf(FVConfig
-						.getLogging());
+				threshold = LogLevel.valueOf(FVConfig.mongoGetLogging()); // getLogging()
 		} catch (ConfigError e) {
 			System.err.println("--- Logging threshold"  
 					+ "' not set in config; defaulting to loglevel 'NOTE'");
 			try {
-				FVConfig.setLogging(LogLevel.NOTE.toString());
+				FVConfig.mongoSetLogging(LogLevel.NOTE.toString()); // setLogging(LogLevel.NOTE.toString());
 				needConfigFlush = true;
 
 			} catch (ConfigError e1) {

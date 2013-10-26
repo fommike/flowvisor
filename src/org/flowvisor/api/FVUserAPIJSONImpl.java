@@ -44,7 +44,8 @@ public class FVUserAPIJSONImpl extends FVUserAPIImpl implements FVUserAPIJSON {
 
 		synchronized (FVConfig.class) {
 
-			FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			//FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			FlowMap flowSpace = FVConfig.mongoGetFlowSpaceFlowMap();
 			String logMsg;
 			for (FlowSpaceChangeRequest change : changes){
 
@@ -61,7 +62,7 @@ public class FVUserAPIJSONImpl extends FVUserAPIImpl implements FVUserAPIJSON {
 					// and if the ID is changed after adding it wont be in the proper place in the sorted
 					// set which will cause problems later.
 					if (changeOp == FlowChangeOp.ADD){
-						entry.setId(FlowSpaceImpl.getProxy().addRule(entry));
+						entry.setId(FlowSpaceImpl.getProxy().mongoAddRule(entry)); // addRule(entry)
 					}
 					flowSpace.addRule(entry);
 					logMsg += flowspaceAddChangeLogMessage(entry.getDpid(), entry.getRuleMatch(), entry.getPriority(),

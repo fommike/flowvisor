@@ -50,6 +50,8 @@ public interface FlowSpace extends FVAppConfig {
 	 */
 	public FlowMap getFlowMap() throws ConfigError;
 	
+	// Mongo change
+	public FlowMap mongoGetFlowMap() throws ConfigError;
 	
 	/**
 	 * Writes the flowmap to the data repository.
@@ -86,6 +88,9 @@ public interface FlowSpace extends FVAppConfig {
 	 * @return id of the rule
 	 */
 	public int addRule(FlowEntry fe) throws ConfigError;
+	
+	// Mongo change
+	public int mongoAddRule(FlowEntry fe) throws ConfigError;
 
 	/**
 	 * Preserve the flowspace for future usage.

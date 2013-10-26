@@ -87,40 +87,43 @@ public class UpdateSlice implements ApiHandler<Map<String, Object>> {
 	private void updateStatus(String sliceName, Boolean status) {
 		if (status == null)
 			return;
-		SliceImpl.getProxy().setAdminStatus(sliceName, status);
-		FlowSpaceImpl.getProxy().notifyChange(FVConfig.getFlowSpaceFlowMap());
+		//SliceImpl.getProxy().setAdminStatus(sliceName, status);
+		SliceImpl.getProxy().mongoSetAdminStatus(sliceName, status);
+		FlowSpaceImpl.getProxy().notifyChange(FVConfig.mongoGetFlowSpaceFlowMap()); //getFlowSpaceFlowMap()
 	}
 
 
 	private void updateRate(String sliceName, Number rate) throws ConfigError {
 		if (rate == null)
 			return;
-		for (FVClassifier classifier : HandlerUtils.getAllClassifiers())
-			SwitchImpl.getProxy().setRateLimit(sliceName, classifier.getDPID(), rate.intValue());
-		
+		for (FVClassifier classifier : HandlerUtils.getAllClassifiers()) {
+			//SwitchImpl.getProxy().setRateLimit(sliceName, classifier.getDPID(), rate.intValue());
+			SwitchImpl.getProxy().mongoSetRateLimit(sliceName, classifier.getDPID(), rate.intValue());
+		}
 	}
 
 
 	private void updateLLDP(String sliceName, Boolean lldpOptIn) {
 		if (lldpOptIn == null)
 			return;
-		SliceImpl.getProxy().setlldp_spam(sliceName, lldpOptIn);
-		
+		//SliceImpl.getProxy().setlldp_spam(sliceName, lldpOptIn);
+		SliceImpl.getProxy().mongoSetLLDPSpam(sliceName, lldpOptIn);
 	}
 
 
 	private void updateMaxFM(String sliceName, Number max) throws ConfigError {
 		if (max == null)
 			return;
-		SliceImpl.getProxy().setMaxFlowMods(sliceName, max.intValue());
-		
+		//SliceImpl.getProxy().setMaxFlowMods(sliceName, max.intValue());
+		SliceImpl.getProxy().mongoSetMaxFlowMods(sliceName, max.intValue());
 	}
 
 
 	private void updateAdminInfo(String sliceName, String adminInfo) throws ConfigError {
 		if (adminInfo == null)
 			return;
-		SliceImpl.getProxy().setContactEmail(sliceName, adminInfo);
+		//SliceImpl.getProxy().setContactEmail(sliceName, adminInfo);
+		SliceImpl.getProxy().mongoSetContactEmail(sliceName, adminInfo);
 	}
 
 
@@ -128,13 +131,19 @@ public class UpdateSlice implements ApiHandler<Map<String, Object>> {
 			Number ctrlPort) throws ConfigError, DuplicateControllerException {
 		if (ctrlHost == null && ctrlPort == null) 
 			return;
-		if (ctrlPort == null)
-			ctrlPort = SliceImpl.getProxy().getcontroller_port(sliceName);
-		if (ctrlHost == null)
-			ctrlHost = SliceImpl.getProxy().getcontroller_hostname(sliceName);
+		if (ctrlPort == null){
+			//ctrlPort = SliceImpl.getProxy().getcontroller_port(sliceName);
+			ctrlPort = SliceImpl.getProxy().mongoGetControllerPort(sliceName);
+		}
+		if (ctrlHost == null){
+			//ctrlHost = SliceImpl.getProxy().getcontroller_hostname(sliceName);
+			ctrlHost = SliceImpl.getProxy().mongoGetControllerHostname(sliceName);
+		}
 		checkDupCtrl(sliceName, ctrlHost, ctrlPort.intValue());
-		SliceImpl.getProxy().setcontroller_hostname(sliceName, ctrlHost);
-		SliceImpl.getProxy().setcontroller_port(sliceName, ctrlPort.intValue());
+		//SliceImpl.getProxy().setcontroller_hostname(sliceName, ctrlHost);
+		//SliceImpl.getProxy().setcontroller_port(sliceName, ctrlPort.intValue());
+		SliceImpl.getProxy().mongoSetControllerHostname(sliceName, ctrlHost);
+		SliceImpl.getProxy().mongoSetControllerPort(sliceName, ctrlPort.intValue());
 	}
 
 
@@ -142,16 +151,18 @@ public class UpdateSlice implements ApiHandler<Map<String, Object>> {
 			Integer ctrlPort) throws ConfigError, DuplicateControllerException {
 		String host = null;
 		Integer port = null;
-		List<String> slices = FVConfig.getAllSlices();
+		//List<String> slices = FVConfig.getAllSlices();
+		List<String> slices = FVConfig.mongoGetAllSlices();
 		for (String slice : slices) {
 			if (slice.equals(sliceName))
 				continue;
-			host = SliceImpl.getProxy().getcontroller_hostname(slice);
-			port = SliceImpl.getProxy().getcontroller_port(slice);
+			//host = SliceImpl.getProxy().getcontroller_hostname(slice);
+			//port = SliceImpl.getProxy().getcontroller_port(slice);
+			host = SliceImpl.getProxy().mongoGetControllerHostname(sliceName);
+			port = SliceImpl.getProxy().mongoGetControllerPort(sliceName);
 			if (port == ctrlPort && host.equalsIgnoreCase(ctrlHost))
 				throw new DuplicateControllerException(ctrlHost, ctrlPort, sliceName, "update");
-		}
-		
+		}	
 	}
 
 
@@ -160,7 +171,8 @@ public class UpdateSlice implements ApiHandler<Map<String, Object>> {
 		if (dropPolicy == null)
 			return;
 		validateDropPolicy(dropPolicy);
-		SliceImpl.getProxy().setdrop_policy(sliceName, dropPolicy);
+		//SliceImpl.getProxy().setdrop_policy(sliceName, dropPolicy);
+		SliceImpl.getProxy().mongoSetDropPolicy(sliceName, dropPolicy);
 	}
 
 
@@ -174,7 +186,8 @@ public class UpdateSlice implements ApiHandler<Map<String, Object>> {
 
 	private void validateSliceName(String sliceName)
 		throws ConfigError, PermissionDeniedException {
-		List<String> slices = FVConfig.getAllSlices();
+		//List<String> slices = FVConfig.getAllSlices();
+		List<String> slices = FVConfig.mongoGetAllSlices();
 		if (!slices.contains(sliceName))
 			throw new PermissionDeniedException(
 					"Slice " + sliceName + " does not exist");

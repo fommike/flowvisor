@@ -13,8 +13,6 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2ParamsType;
 import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 
 public class ListSlices implements ApiHandler<Object> {
-
-	
 	
 	@SuppressWarnings("unchecked")
 	@Override
@@ -23,10 +21,12 @@ public class ListSlices implements ApiHandler<Object> {
 		try {
 			List<HashMap<String, Object>> list = new LinkedList<HashMap<String,Object>>();
 			HashMap<String, Object> slicers = new HashMap<String, Object>();
-			List<String> slices = SliceImpl.getProxy().getAllSliceNames();
+			//List<String> slices = SliceImpl.getProxy().getAllSliceNames();
+			List<String> slices = SliceImpl.getProxy().mongoGetAllSliceNames();
 			for (String slice : slices) {
 				slicers.put(SLICENAME, slice);
-				slicers.put(ADMINSTATUS, SliceImpl.getProxy().isSliceUp(slice));
+				//slicers.put(ADMINSTATUS, SliceImpl.getProxy().isSliceUp(slice));
+				slicers.put(ADMINSTATUS, SliceImpl.getProxy().mongoIsSliceUp(slice));
 				list.add((HashMap<String, Object>)slicers.clone() );
 				slicers.clear();
 			}

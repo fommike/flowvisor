@@ -30,12 +30,12 @@ public class ListSliceInfo implements ApiHandler<Map<String, Object>> {
 			String sliceName = HandlerUtils.<String>fetchField(SLICENAME, params, true, null);
 			retvals.put(SLICENAME, sliceName);
 			retvals.put(CTRLURL, "tcp:" + 
-					SliceImpl.getProxy().getcontroller_hostname(sliceName) + ":" +
-					SliceImpl.getProxy().getcontroller_port(sliceName));
-			retvals.put(ADMIN, SliceImpl.getProxy().getEmail(sliceName));
-			retvals.put(DROP, SliceImpl.getProxy().getdrop_policy(sliceName));
-			retvals.put(LLDP, SliceImpl.getProxy().getlldp_spam(sliceName));
-			retvals.put(ADMINSTATUS, SliceImpl.getProxy().isSliceUp(sliceName));
+					SliceImpl.getProxy().mongoGetControllerHostname(sliceName) + ":" + //getcontroller_hostname(sliceName)
+					SliceImpl.getProxy().mongoGetControllerPort(sliceName)); //getcontroller_port(sliceName)
+			retvals.put(ADMIN, SliceImpl.getProxy().mongoGetEmail(sliceName)); // getEmail(sliceName)
+			retvals.put(DROP, SliceImpl.getProxy().mongoGetDropPolicy(sliceName)); // getdrop_policy(sliceName)
+			retvals.put(LLDP, SliceImpl.getProxy().mongoGetLLDPSpam(sliceName)); // getlldp_spam(sliceName)
+			retvals.put(ADMINSTATUS, SliceImpl.getProxy().mongoIsSliceUp(sliceName)); // isSliceUp(sliceName));
 			try {
 				SlicerLimits sl = HandlerUtils.getSliceLimits();
 				TokenBucket tb = sl.getRateLimiter(sliceName);

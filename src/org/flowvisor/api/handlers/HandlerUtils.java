@@ -205,7 +205,7 @@ public class HandlerUtils {
 	}
 	
 	public static List<String> getAllSlices() throws ConfigError {
-		return SliceImpl.getProxy().getAllSliceNames();
+		return SliceImpl.getProxy().mongoGetAllSliceNames(); //getAllSliceNames();
 	}
 	
 	public static boolean sliceExists(String sliceName) 

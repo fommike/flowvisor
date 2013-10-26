@@ -28,8 +28,10 @@ public class RemoveSlice implements ApiHandler<Map<String, Object>> {
 			 */
 			String sliceName = HandlerUtils.<String>fetchField(SLICENAME, params, true, null);
 			//Boolean preserve = HandlerUtils.<Boolean>fetchField(PRESERVE, params, false, false);
-			SliceImpl.getProxy().deleteSlice(sliceName);
-			FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			//SliceImpl.getProxy().deleteSlice(sliceName);
+			SliceImpl.getProxy().mongoDeleteSlice(sliceName);
+			//FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			FlowMap flowSpace = FVConfig.mongoGetFlowSpaceFlowMap();
 			FlowSpaceImpl.getProxy().notifyChange(flowSpace);
 			resp = new JSONRPC2Response(true, 0);
 		} catch (ClassCastException e) {

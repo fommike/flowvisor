@@ -1,6 +1,7 @@
 package org.flowvisor.config;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -8,6 +9,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 
 import org.flowvisor.api.APIAuth;
 import org.flowvisor.exceptions.DuplicateControllerException;
@@ -15,8 +17,14 @@ import org.flowvisor.flows.FlowMap;
 import org.flowvisor.log.FVLog;
 import org.flowvisor.log.LogLevel;
 
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
+
 public class SliceImpl implements Slice {
-	
 	
 	private static SliceImpl instance = null;
 	
@@ -60,7 +68,7 @@ public class SliceImpl implements Slice {
 			" = ? WHERE " + SLICE + " = ?";
 	
 	
-	private static String FLOWVISOR = "SELECT id from " + Flowvisor.FLOWVISOR + " WHERE " + Flowvisor.CONFIG + " = ?"; 
+	private static String FLOWVISOR = "SELECT id from " + Flowvisor.FLOWVISOR + " WHERE " + Flowvisor.CONFIG + " = ?";
 	
 
 	private ConfDBSettings settings = null;
@@ -73,18 +81,18 @@ public class SliceImpl implements Slice {
 	}
 
 	@Override
-	public void setlldp_spam(String sliceName, Boolean lldp_spam) {
+	public void setlldp_spam(String sliceName, Boolean LLDPSpam) {
 		Connection conn = null;
 		PreparedStatement ps = null;
 		ResultSet set = null;
 		try {
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(SLLDPSQL);
-			ps.setBoolean(1, lldp_spam);
+			ps.setBoolean(1, LLDPSpam);
 			ps.setString(2, sliceName);
 			if (ps.executeUpdate() == 0)
 				FVLog.log(LogLevel.WARN, null, "LLDP update had no effect.");
-			notify(sliceName, FLLDP, lldp_spam);
+			notify(sliceName, FLLDP, LLDPSpam);
 		} catch (SQLException e) {
 			FVLog.log(LogLevel.WARN, null, e.getMessage());
 		} finally {
@@ -94,8 +102,32 @@ public class SliceImpl implements Slice {
 		}	
 	}
 	
+	@Override
+	public void mongoSetLLDPSpam(String sliceName, Boolean LLDPSpam) {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + LLDP;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, LLDPSpam));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+			notify(sliceName, FLLDP, LLDPSpam);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
 	
-
 	@Override
 	public void setdrop_policy(String sliceName, String policy) {
 		Connection conn = null;
@@ -116,9 +148,34 @@ public class SliceImpl implements Slice {
 			close(ps);
 			close(conn);	
 		}	
-
 	}
 
+	@Override
+	public void mongoSetDropPolicy(String sliceName, String policy) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + DROP;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, policy));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+			notify(sliceName, FDROP, policy);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+	
+	
 	@Override
 	public void setcontroller_hostname(String sliceName, String name) throws ConfigError {
 		Connection conn = null;
@@ -142,9 +199,35 @@ public class SliceImpl implements Slice {
 			close(ps);
 			close(conn);	
 		}
-
 	}
 
+	@Override
+	public void mongoSetControllerHostname(String sliceName, String name) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + HOST;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, name));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+			notify(sliceName, FHOST, name);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+			throw new ConfigError("Unable to update controller hostname for slice " + sliceName);
+		} 
+	}
+	
 	@Override
 	public void setcontroller_port(String sliceName, Integer port) throws ConfigError {
 		Connection conn = null;
@@ -170,6 +253,33 @@ public class SliceImpl implements Slice {
 	}
 	
 	@Override
+	public void mongoSetControllerPort(String sliceName, Integer port) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + PORT;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, port));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+			notify(sliceName, FPORT, port);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+			throw new ConfigError("Unable to set the controller port for slice " + sliceName);
+		} 
+	}
+	
+	@Override
 	public void setContactEmail(String sliceName, String email) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -188,6 +298,31 @@ public class SliceImpl implements Slice {
 			close(ps);
 			close(conn);	
 		}
+	}
+	
+	@Override
+	public void mongoSetContactEmail(String sliceName, String email) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + EMAIL;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, email));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		
 	}
 	
 	@Override
@@ -213,6 +348,34 @@ public class SliceImpl implements Slice {
 	}
 	
 	@Override
+	public void mongoSetPasswd(String sliceName, String salt, String crypt) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateSalt = TSLICE + ".$." + SALT;
+		String updateCrypt = TSLICE + ".$." + CRYPT;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject updateFields = new BasicDBObject();
+			updateFields.put(updateSalt, salt);
+			updateFields.put(updateCrypt, crypt);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", updateFields);
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+		} catch (UnknownHostException e) {
+		}
+	}
+	
+	
+	@Override
 	public void setMaxFlowMods(String sliceName, int limit) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -236,6 +399,46 @@ public class SliceImpl implements Slice {
 	}
 
 	@Override
+	public void mongoSetMaxFlowMods(String sliceName, int limit) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + FMLIMIT;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, limit));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+			/*
+			BasicDBObject sliceQuery1 = new BasicDBObject();
+			BasicDBObject sliceFields = new BasicDBObject().append(TSLICE, 1).append("_id", false); 
+				
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery1, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					System.out.println(sliceSelect.next());
+				}
+			} finally {
+				sliceSelect.close();
+			}
+			*/
+			
+			notify(sliceName, FFMLIMIT, limit);
+			
+		} catch (UnknownHostException e) {
+			throw new ConfigError("Global limit for slice " + sliceName + " was not set to " + limit);
+		} 
+	}
+	
+	@Override
 	public Integer getMaxFlowMods(String sliceName) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -258,6 +461,44 @@ public class SliceImpl implements Slice {
 		return null;
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public Integer mongoGetMaxFlowMods(String sliceName) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						throw new ConfigError("Max flow rules for slice named " + sliceName + " not found!");
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getInt(FMLIMIT);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	
 	@Override
 	public Boolean getlldp_spam(String sliceName) {
 		Connection conn = null;
@@ -278,6 +519,45 @@ public class SliceImpl implements Slice {
 			close(conn);
 			
 		}
+		return null;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Boolean mongoGetLLDPSpam(String sliceName) {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						return true;
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getBoolean(LLDP);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		
 		return null;
 	}
 
@@ -304,6 +584,45 @@ public class SliceImpl implements Slice {
 		return null;
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public String mongoGetDropPolicy(String sliceName) {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						return null;
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getString(DROP);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		
+		return null;
+	}
+	
 	@Override
 	public String getcontroller_hostname(String sliceName) throws ConfigError {
 		Connection conn = null;
@@ -326,6 +645,44 @@ public class SliceImpl implements Slice {
 			close(conn);
 			
 		}
+		return null;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public String mongoGetControllerHostname(String sliceName) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						throw new ConfigError("Controller host for slice " + sliceName + " not found.");
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getString(HOST);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 		return null;
 	}
 
@@ -351,6 +708,44 @@ public class SliceImpl implements Slice {
 			close(conn);
 			
 		}
+		return null;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Integer mongoGetControllerPort(String sliceName) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						throw new ConfigError("Controller port for slice " + sliceName + " not found!");
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getInt(PORT);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 		return null;
 	}
 	
@@ -405,6 +800,45 @@ public class SliceImpl implements Slice {
 		return null;
 	}
 	
+	@SuppressWarnings("unchecked")
+	@Override
+	public String mongoGetCreator(String sliceName) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						throw new ConfigError("Unknown slice " + sliceName);
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getString(CREATOR);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		
+		return null;
+	}
+	
 	@Override
 	public String getEmail(String sliceName) throws ConfigError {
 		Connection conn = null;
@@ -425,8 +859,45 @@ public class SliceImpl implements Slice {
 			close(set);
 			close(ps);
 			close(conn);
-			
 		}
+		return null;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public String mongoGetEmail(String sliceName) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					if (queryResult == null) 
+						throw new ConfigError("Unknown slice " + sliceName);
+					for (BasicDBObject sliceList: queryResult) {
+						return sliceList.getString(EMAIL);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 		return null;
 	}
 	
@@ -457,6 +928,45 @@ public class SliceImpl implements Slice {
 	}
 	
 	@Override
+	@SuppressWarnings("unchecked")
+	public LinkedList<String> mongoGetAllSliceNames() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String selectField = TSLICE + "." + SLICE;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		LinkedList<String> list = new LinkedList<String>();
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceFields = new BasicDBObject(selectField, 1).append("_id", false);
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> sliceList = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					for (BasicDBObject slice: sliceList) {
+						list.add(slice.get(SLICE).toString());
+					}
+					if (list.isEmpty())
+						throw new ConfigError("No slices defined");
+					return list;
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	@Override
 	public Boolean checkSliceName(String sliceName) {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -478,54 +988,123 @@ public class SliceImpl implements Slice {
 	}
 	
 	@Override
-	public void createSlice(String sliceName, String controller_hostname,
-			int controller_port, String drop_policy, String passwd,
-			String slice_email, String creatorSlice, int flowvisor_id, int type) throws InvalidSliceName,
-			DuplicateControllerException {
-		createSlice(sliceName, controller_hostname,
-				controller_port, drop_policy, passwd,
-				APIAuth.getSalt(), slice_email, creatorSlice, flowvisor_id, type);
+	public Boolean mongoCheckSliceName(String sliceName) {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					if (sliceSelect.next().get(TSLICE) == null)
+						return false;
+					else
+						return true;
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
 	}
 	
 	@Override
-	public void createSlice(String sliceName, String controller_hostname,
-			int controller_port, String drop_policy, String passwd,
-			String slice_email, String creatorSlice, int flowvisor_id) throws InvalidSliceName,
+	public void createSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String sliceEmail, String creatorSlice, int flowvisor_id, int type) throws InvalidSliceName,
 			DuplicateControllerException {
-		createSlice(sliceName, controller_hostname,
-				controller_port, drop_policy, passwd,
-				APIAuth.getSalt(), slice_email, creatorSlice, flowvisor_id,
-				FlowMap.type.FEDERATED.ordinal());
-
+		createSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				APIAuth.getSalt(), sliceEmail, creatorSlice, flowvisor_id, type);
 	}
-
+	
 	@Override
-	public void createSlice(String sliceName, String controller_hostname,
-			int controller_port, String drop_policy, String passwd,
-			String slice_email, String creatorSlice) throws InvalidSliceName,
+	public void mongoCreateSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String sliceEmail, String creatorSlice, int type) throws InvalidSliceName,
 			DuplicateControllerException {
-		createSlice(sliceName, controller_hostname,
-				controller_port, drop_policy, passwd,
-				APIAuth.getSalt(), slice_email, creatorSlice, 1,
+		String mongo;
+		mongoCreateSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				APIAuth.getSalt(), sliceEmail, creatorSlice, type);
+	}
+	
+	@Override
+	public void createSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String sliceEmail, String creatorSlice, int flowvisor_id) throws InvalidSliceName,
+			DuplicateControllerException {
+		createSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				APIAuth.getSalt(), sliceEmail, creatorSlice, flowvisor_id,
 				FlowMap.type.FEDERATED.ordinal());
 
 	}
 	
 	@Override
-	public void createSlice(String sliceName, String controller_hostname,
-			int controller_port, String drop_policy, String passwd,
-			String salt, String slice_email, String creatorSlice)
+	public void mongoCreateSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String sliceEmail, String creatorSlice)
+					throws InvalidSliceName, DuplicateControllerException {
+		String mongo;
+		mongoCreateSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				APIAuth.getSalt(), sliceEmail, creatorSlice, FlowMap.type.FEDERATED.ordinal());
+	}
+
+	@Override
+	public void createSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String sliceEmail, String creatorSlice) throws InvalidSliceName,
+			DuplicateControllerException {
+		createSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				APIAuth.getSalt(), sliceEmail, creatorSlice, 1,
+				FlowMap.type.FEDERATED.ordinal());
+
+	}
+	
+	@Override
+	public void createSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String salt, String sliceEmail, String creatorSlice)
 			throws InvalidSliceName, DuplicateControllerException {
-		createSlice(sliceName, controller_hostname,
-				controller_port, drop_policy, passwd,
-				salt, slice_email, creatorSlice, 1, FlowMap.type.FEDERATED.ordinal());
+		createSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				salt, sliceEmail, creatorSlice, 1, FlowMap.type.FEDERATED.ordinal());
+		
+	}
+	
+	@Override
+	public void mongoCreateSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String salt, String sliceEmail, String creatorSlice)
+			throws InvalidSliceName, DuplicateControllerException {
+		String mongo;
+		mongoCreateSlice(sliceName, controllerHostname,
+				controllerPort, dropPolicy, passwd,
+				salt, sliceEmail, creatorSlice, FlowMap.type.FEDERATED.ordinal());
 		
 	}
 
 	@Override
-	public void createSlice(String sliceName, String controller_hostname,
-			int controller_port, String drop_policy, String passwd,
-			String salt, String slice_email, String creatorSlice, int flowvisor_id, int type)
+	public void createSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String salt, String sliceEmail, String creatorSlice, int flowvisor_id, int type)
 			throws DuplicateControllerException {
 		String crypt = APIAuth.makeCrypt(salt, passwd);
 		Connection conn = null;
@@ -534,11 +1113,11 @@ public class SliceImpl implements Slice {
 		try {
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(CONTCHECK);
-			ps.setString(1, controller_hostname);
-			ps.setInt(2, controller_port);
+			ps.setString(1, controllerHostname);
+			ps.setInt(2, controllerPort);
 			set = ps.executeQuery();
 			if (set.next())
-				throw new DuplicateControllerException(controller_hostname, controller_port, sliceName, null);
+				throw new DuplicateControllerException(controllerHostname, controllerPort, sliceName, null);
             close(conn);
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(CREATESLICE);
@@ -548,10 +1127,10 @@ public class SliceImpl implements Slice {
 			ps.setString(4, creatorSlice);
 			ps.setString(5, crypt);
 			ps.setString(6, salt);
-			ps.setString(7, controller_hostname);
-			ps.setInt(8, controller_port);
-			ps.setString(9, slice_email);
-			ps.setString(10, drop_policy);
+			ps.setString(7, controllerHostname);
+			ps.setInt(8, controllerPort);
+			ps.setString(9, sliceEmail);
+			ps.setString(10, dropPolicy);
 			ps.setBoolean(11, true);
 			ps.setInt(12, -1);
 			if (ps.executeUpdate() == 0)
@@ -562,15 +1141,80 @@ public class SliceImpl implements Slice {
 			close(set);
 			close(ps);
 			close(conn);
-			
 		}	
 	}
 	
+	@Override
+	public void mongoCreateSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String salt, String sliceEmail, String creatorSlice, int type)
+			throws DuplicateControllerException {
+		
+		String mongo;	
+		String crypt = APIAuth.makeCrypt(salt, passwd);
+		String Flowvisor = "Flowvisor";
+		String FSR = "FlowSpaceRule";
+		String updateField = TSLICE;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			String clauseCondition1 = HOST;
+			String clauseCondition2 = PORT;
+			
+			BasicDBObject searchQuery = new BasicDBObject();
+			
+			BasicDBObject queryClasue1 = new BasicDBObject(clauseCondition1, controllerHostname);
+			BasicDBObject queryClasue2 = new BasicDBObject(clauseCondition2, controllerPort);
+			
+			BasicDBList compositeQuery = new BasicDBList();
+			compositeQuery.add(queryClasue1);
+			compositeQuery.add(queryClasue2);
+			
+			BasicDBObject sliceQuery = new BasicDBObject("$and", compositeQuery);
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", sliceQuery);
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(searchQuery, sliceFields);
+			
+			if (sliceSelect.next().get(TSLICE) == null) {
+				
+				BasicDBObject sliceSet = new BasicDBObject();
+				
+				sliceSet.put(EMAIL, sliceEmail);
+				sliceSet.put(CREATOR, creatorSlice);
+				sliceSet.put(SALT, salt);
+				sliceSet.put(DROP, dropPolicy);
+				sliceSet.put(FMLIMIT, -1);
+				sliceSet.put(SLICE, sliceName);
+				sliceSet.put(PORT, controllerPort);
+				sliceSet.put(HOST, controllerHostname);
+				sliceSet.put(FMTYPE, type); 	
+				sliceSet.put(CRYPT, crypt);
+				sliceSet.put(LLDP, true);
+				List<BasicDBObject> FSRList = new ArrayList<BasicDBObject>();
+				sliceSet.put(FSR, FSRList);
+				
+				BasicDBObject sliceUpdate = new BasicDBObject("$push", new BasicDBObject(updateField, sliceSet));
+				flowvisorColl.update(searchQuery, sliceUpdate);
+				
+				sliceSelect.close();
+				
+			} else
+				throw new DuplicateControllerException(controllerHostname, controllerPort, sliceName, null);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
 	
 	@Override
-	public void createSlice(String sliceName, String controller_hostname,
-			int controller_port, String drop_policy, String passwd,
-			String salt, String slice_email, String creatorSlice, boolean lldp_spam, 
+	public void createSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String salt, String sliceEmail, String creatorSlice, boolean LLDPSpam, 
 			int maxFlowMods, int flowvisor_id, int type)
 			throws DuplicateControllerException {
 		String crypt = APIAuth.makeCrypt(salt, passwd);
@@ -580,11 +1224,11 @@ public class SliceImpl implements Slice {
 		try {
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(CONTCHECK);
-			ps.setString(1, controller_hostname);
-			ps.setInt(2, controller_port);
+			ps.setString(1, controllerHostname);
+			ps.setInt(2, controllerPort);
 			set = ps.executeQuery();
 			if (set.next())
-				throw new DuplicateControllerException(controller_hostname, controller_port, sliceName, null);
+				throw new DuplicateControllerException(controllerHostname, controllerPort, sliceName, null);
             close(conn);
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(CREATESLICE);
@@ -594,11 +1238,11 @@ public class SliceImpl implements Slice {
 			ps.setString(4, creatorSlice);
 			ps.setString(5, crypt);
 			ps.setString(6, salt);
-			ps.setString(7, controller_hostname);
-			ps.setInt(8, controller_port);
-			ps.setString(9, slice_email);
-			ps.setString(10, drop_policy);
-			ps.setBoolean(11, lldp_spam);
+			ps.setString(7, controllerHostname);
+			ps.setInt(8, controllerPort);
+			ps.setString(9, sliceEmail);
+			ps.setString(10, dropPolicy);
+			ps.setBoolean(11, LLDPSpam);
 			ps.setInt(12, maxFlowMods);
 			if (ps.executeUpdate() == 0) {
 				FVLog.log(LogLevel.WARN, null, "Slice " + sliceName + " creation had no effect.");
@@ -610,10 +1254,76 @@ public class SliceImpl implements Slice {
 			close(set);
 			close(ps);
 			close(conn);
-			
 		}	
 	}
 
+	@Override
+	public void mongoCreateSlice(String sliceName, String controllerHostname,
+			int controllerPort, String dropPolicy, String passwd,
+			String salt, String sliceEmail, String creatorSlice, 
+			boolean LLDPSpam, int maxFlowMods, int type)
+			throws DuplicateControllerException {
+		
+		String mongo;
+		String crypt = APIAuth.makeCrypt(salt, passwd);
+		String Flowvisor = "Flowvisor";
+		String FSR = "FlowSpaceRule";
+		String updateField = TSLICE;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			String clauseCondition1 = HOST;
+			String clauseCondition2 = PORT;
+			
+			BasicDBObject searchQuery = new BasicDBObject();
+			
+			BasicDBObject queryClasue1 = new BasicDBObject(clauseCondition1, controllerHostname);
+			BasicDBObject queryClasue2 = new BasicDBObject(clauseCondition2, controllerPort);
+			
+			BasicDBList compositeQuery = new BasicDBList();
+			compositeQuery.add(queryClasue1);
+			compositeQuery.add(queryClasue2);
+			
+			BasicDBObject sliceQuery = new BasicDBObject("$and", compositeQuery);
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", sliceQuery);
+			BasicDBObject sliceFields = new BasicDBObject(TSLICE, sliceMatch).append("_id", false); 
+			
+			DBCursor sliceSelect = flowvisorColl.find(searchQuery, sliceFields);
+			
+			if (sliceSelect.next().get(TSLICE) == null) {
+				
+				BasicDBObject sliceSet = new BasicDBObject();
+				
+				sliceSet.put(EMAIL, sliceEmail);
+				sliceSet.put(CREATOR, creatorSlice);
+				sliceSet.put(SALT, salt);
+				sliceSet.put(DROP, dropPolicy);
+				sliceSet.put(FMLIMIT, maxFlowMods);
+				sliceSet.put(SLICE, sliceName);
+				sliceSet.put(PORT, controllerPort);
+				sliceSet.put(HOST, controllerHostname);
+				sliceSet.put(FMTYPE, type); 	
+				sliceSet.put(CRYPT, crypt);
+				sliceSet.put(LLDP, LLDPSpam);
+				List<BasicDBObject> FSRList = new ArrayList<BasicDBObject>();
+				sliceSet.put(FSR, FSRList);
+				
+				BasicDBObject sliceUpdate = new BasicDBObject("$push", new BasicDBObject(updateField, sliceSet));
+				flowvisorColl.update(searchQuery, sliceUpdate);
+				
+				sliceSelect.close();
+				
+			} else
+				throw new DuplicateControllerException(controllerHostname, controllerPort, sliceName, null);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
 	
 	@Override
 	public void deleteSlice(String sliceName, Boolean preserve) 
@@ -621,7 +1331,6 @@ public class SliceImpl implements Slice {
 		if (preserve) 
 			FlowSpaceImpl.getProxy().saveFlowSpace(sliceName);
 		deleteSlice(sliceName);
-
 	}
 	
 	@Override
@@ -642,7 +1351,28 @@ public class SliceImpl implements Slice {
 			close(ps);
 			close(conn);
 		}
-
+	}
+	
+	@Override
+	public void mongoDeleteSlice(String sliceName) throws InvalidSliceName {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject(TSLICE, new BasicDBObject(SLICE, sliceName));
+			flowvisorColl.update(sliceQuery, new BasicDBObject("$pull", sliceUpdate));
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 	}
 	
 	@Override
@@ -663,6 +1393,29 @@ public class SliceImpl implements Slice {
 			close(ps);
 			close(conn);
 		}
+	}
+	
+	@Override
+	public void mongoSetAdminStatus(String sliceName, boolean status) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSLICE + "." + SLICE;
+		String updateField = TSLICE + ".$." + ADMINDOWN;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, status));
+			flowvisorColl.update(sliceQuery, sliceUpdate);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 	}
 	 
 	@Override
@@ -686,6 +1439,43 @@ public class SliceImpl implements Slice {
 		}
 		return false;
 	}
+	
+	@Override
+	@SuppressWarnings("unchecked")
+	public boolean mongoIsSliceUp(String sliceName) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String selectField = TSLICE + "." + ADMINDOWN;
+		String queryCondition = TSLICE + "." + SLICE;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject sliceQuery = new BasicDBObject(queryCondition, sliceName);
+			BasicDBObject sliceFields = new BasicDBObject(selectField, 1).append("_id", false);
+			
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+					ArrayList<BasicDBObject> sliceList = (ArrayList<BasicDBObject>) sliceSelect.next().get(TSLICE);
+					for (BasicDBObject slice: sliceList) {
+						return slice.getBoolean(ADMINDOWN);
+					}
+				}
+			} finally {
+				sliceSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return false;
+	}
+	
 	
 	@Override
 	public void close(Connection conn) {
@@ -774,6 +1564,48 @@ public class SliceImpl implements Slice {
 	
 		return output;
 	}
+	
+	@Override
+	public HashMap<String, Object> mongoToJson(HashMap<String, Object> output) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String Slice = "Slice"; // This will go once we have consistency in the naming
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		LinkedList<Object> list = new LinkedList<Object>();
+
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+	
+			BasicDBObject sliceQuery = new BasicDBObject();
+			BasicDBObject sliceFields = new BasicDBObject().append(Slice, 1).append("_id", false);
+			DBCursor sliceSelect = flowvisorColl.find(sliceQuery, sliceFields);
+			
+			try {
+				while (sliceSelect.hasNext()) {
+				
+					BasicDBList e = (BasicDBList) sliceSelect.next().get("Slice");
+				
+					for (int i = 0; i < e.size(); i++) {
+						
+						list.add(e.get(i));
+						//System.out.println(e.get(i));
+					}
+					
+				}
+			} finally {
+				sliceSelect.close();
+			}
+			output.put(Slice, list);
+			//System.out.println("list: " + list);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, "Failed to write mongo Slice info : "  + e.getMessage());
+		}
+		return output;
+	}
 
 	@Override
 	public void fromJson(ArrayList<HashMap<String, Object>> list) throws IOException {
@@ -830,7 +1662,64 @@ public class SliceImpl implements Slice {
 			close(ps);
 			close(conn);	
 		}
+	}
+	
+	@Override
+	public void mongoFromJson(ArrayList<HashMap<String, Object>> list)
+			throws IOException {
 		
+		String mongo;
+		String Slice = "Slice"; // This will go once we have consistency in the naming
+		DB conn = null;
+		DBCollection sliceColl = null;
+		
+	try {	
+			conn = settings.getMongoConnection();
+			sliceColl = conn.getCollection(Slice);
+			
+			BasicDBObject sliceInsert = new BasicDBObject();
+			
+			for (HashMap<String, Object> row : list) {
+				
+				sliceInsert.put(EMAIL, (String) row.get(EMAIL));
+				
+				if (row.get(ADMINDOWN) != null)
+					sliceInsert.put((String) row.get(SLICE), (Boolean) row.get(ADMINDOWN));
+				else
+					sliceInsert.put((String) row.get(SLICE), true);
+			
+				sliceInsert.put(CREATOR, (String) row.get(CREATOR));
+				sliceInsert.put(SALT, (String) row.get(SALT));
+				
+				if (row.get(DROP) == null)
+					row.put(DROP, "exact");
+				sliceInsert.put(DROP, (String) row.get(DROP));
+				
+				sliceInsert.put(Flowvisor.CONFIG, (String) row.get(Flowvisor.CONFIG));
+				
+				if (row.get(FMLIMIT) != null)
+					sliceInsert.put(FMLIMIT, ((Double) row.get(FMLIMIT)).intValue());
+				else 
+					sliceInsert.put(FMLIMIT, -1);
+					
+				sliceInsert.put(SLICE, (String) row.get(SLICE));
+				sliceInsert.put(PORT, ((Double) row.get(PORT)).intValue());
+				sliceInsert.put(HOST, (String) row.get(HOST));
+				sliceInsert.put(FMTYPE, (String) row.get(FMTYPE));
+				sliceInsert.put(CRYPT, (String) row.get(CRYPT));
+				
+				if (row.get(LLDP) == null) 
+					row.put(LLDP, true);
+				sliceInsert.put(LLDP, (Boolean)row.get(LLDP));	
+			}
+			
+			sliceColl.insert(sliceInsert);
+			DBObject query = sliceColl.findOne();
+			System.out.println(query);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, "Failed to write mongo Slice info : "  + e.getMessage());
+		}
 	}
 
 	private void processAlter(String alter) {
@@ -862,8 +1751,4 @@ public class SliceImpl implements Slice {
 		
 		
 	}
-
-	
-	
-
 }

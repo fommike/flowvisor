@@ -79,7 +79,8 @@ public class FlowSpaceUtil {
 		FVMatch match = new FVMatch();
 		FlowMap ret = new LinearFlowMap();
 		match.setWildcards(FVMatch.OFPFW_ALL);
-		FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+		//FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+		FlowMap flowSpace = FVConfig.mongoGetFlowSpaceFlowMap();
 		List<FlowIntersect> intersections = flowSpace.intersects(
 				FlowEntry.ALL_DPIDS, match);
 		for (FlowIntersect inter : intersections) {
@@ -176,8 +177,8 @@ public class FlowSpaceUtil {
 
 		switch (args.length) {
 		case 2:
-			Set<String> slices = FlowSpaceUtil.getSlicesByDPID(
-					FVConfig.getFlowSpaceFlowMap(), dpid);
+			Set<String> slices = FlowSpaceUtil.getSlicesByDPID( 
+					FVConfig.mongoGetFlowSpaceFlowMap(), dpid);	// FVConfig.getFlowSpaceFlowMap()
 			System.out.println("The following slices have access to dpid="
 					+ args[1]);
 			for (String slice : slices)
@@ -185,7 +186,7 @@ public class FlowSpaceUtil {
 			break;
 		case 3:
 			Set<Short> ports = FlowSpaceUtil.getPortsBySlice(dpid, args[2],
-					FVConfig.getFlowSpaceFlowMap());
+					FVConfig.mongoGetFlowSpaceFlowMap()); // FVConfig.getFlowSpaceFlowMap()
 			System.out.println("Slice " + args[2] + " on switch " + args[1]
 					+ " has access to port:");
 			if (ports.size() == 1
@@ -211,7 +212,8 @@ public class FlowSpaceUtil {
 	 */
 	
 	public static FlowMap getFlowMap(long dpid)  throws ConfigError {
-		FlowMap fm = FVConfig.getFlowSpaceFlowMap();
+		//FlowMap fm = FVConfig.getFlowSpaceFlowMap();
+		FlowMap fm = FVConfig.mongoGetFlowSpaceFlowMap();
 		switch (fm.getType()) {
 		case LINEAR:
 			return FlowSpaceUtil.getSubFlowMap(fm, dpid, new FVMatch());
@@ -235,7 +237,8 @@ public class FlowSpaceUtil {
 	public static FlowMap getSubFlowMap(long dpid) throws ConfigError  {
 		// assumes that new OFMatch() matches everything
 		synchronized (FVConfig.class) {
-			return FlowSpaceUtil.getSubFlowMap(FVConfig.getFlowSpaceFlowMap(),
+			// FVConfig.getFlowSpaceFlowMap()
+			return FlowSpaceUtil.getSubFlowMap(FVConfig.mongoGetFlowSpaceFlowMap(), 
 					dpid, new FVMatch());
 		}
 	}
@@ -352,7 +355,8 @@ public class FlowSpaceUtil {
 	 * @param sliceName
 	 */
 	public static FlowMap deleteFlowSpaceBySlice(String sliceName) throws ConfigError {
-		FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+		//FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+		FlowMap flowSpace = FVConfig.mongoGetFlowSpaceFlowMap();
 		SliceAction sliceAction = null;
 		HashSet<Integer> toRemove = new HashSet<Integer>();
 		synchronized (flowSpace) {

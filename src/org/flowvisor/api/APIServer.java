@@ -47,7 +47,7 @@ public class APIServer {
 		int port;
 
 		try {
-			port = FVConfig.getAPIWSPort();
+			port = FVConfig.mongoGetAPIWSPort(); // getAPIWSPort
 		} catch (ConfigError e) {
 			port = default_port; // not explicitly configured
 		}

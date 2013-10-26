@@ -2,6 +2,7 @@ package org.flowvisor.config;
 
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,12 +27,18 @@ import org.flowvisor.log.LogLevel;
 import org.flowvisor.openflow.protocol.FVMatch;
 import org.openflow.protocol.action.OFAction;
 
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+
 public class FlowSpaceImpl implements FlowSpace {
 
 	private ConfDBSettings settings = null;
 	private static FlowSpaceImpl instance =  null;
 	//private FlowMap cachedFlowMap = null;
-	
+	private int fsrID = 1;
 	
 	//Callbacks
 	
@@ -163,7 +170,6 @@ public class FlowSpaceImpl implements FlowSpace {
 				
 				match.setWildcards(wildcards);
 				
-				
 				actions = conn.prepareStatement(GACTIONS);
 				actions.setInt(1, fsr_id);
 				actionSet = actions.executeQuery();
@@ -182,8 +188,11 @@ public class FlowSpaceImpl implements FlowSpace {
 				fe.setForcedQueue(set.getInt(FORCED_QUEUE));
 				map.addRule(fe);
 			}
-			if (map == null)
+			if (map == null) {
+				System.out.println("Setting up FederatedFM");
 				map = new FederatedFlowMap();
+				
+			}
 			//cachedFlowMap = map;
 			return map;
 		} catch (SQLException e) {
@@ -199,6 +208,135 @@ public class FlowSpaceImpl implements FlowSpace {
 		}	
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public FlowMap mongoGetFlowMap() throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			FlowMap map = null;
+			LinkedList<OFAction> actionsList = null;
+			LinkedList<Integer> queueList = null;
+			FlowEntry fe = null;
+			SliceAction act = null;
+			int wildcards = -1;
+			int fsr_id = -1;
+			
+			String queryCondition = Slice.TSLICE + "." + Slice.ADMINDOWN;
+			
+			BasicDBObject FSRQuery = new BasicDBObject(queryCondition, true);
+			BasicDBObject FSRFields = new BasicDBObject(Slice.TSLICE, 1).append("_id", false);
+			DBCursor FSRSelect = flowvisorColl.find(FSRQuery, FSRFields);
+				
+			try {
+				while (FSRSelect.hasNext()) {
+					
+					List<BasicDBObject> sliceList = (ArrayList<BasicDBObject>) FSRSelect.next().get(Slice.TSLICE);
+					for (BasicDBObject slice: sliceList) {
+						if (slice.getBoolean(Slice.ADMINDOWN) == true && slice.get(FS) != null) {
+							
+							List<BasicDBObject> FSRList = (ArrayList<BasicDBObject>) slice.get(FS);
+							if (FSRList.size() != 0) {
+								
+								if (map == null) 
+									map = FlowSpaceUtil.getNewFlowMap(slice.getInt(Slice.FMTYPE));
+								
+								System.out.println("We are ready to begin!");
+								
+								for (BasicDBObject fsr: FSRList) {
+									
+									FVMatch match = new FVMatch();
+									actionsList = new LinkedList<OFAction>();
+									queueList = new LinkedList<Integer>();
+									
+									wildcards = fsr.getInt(WILDCARDS);
+									fsr_id = fsr.getInt("id");
+									System.out.println("fsr_id: " + fsr_id);
+									match.setInputPort((short) fsr.getInt(INPORT));
+									
+									if ((wildcards & FVMatch.OFPFW_DL_VLAN) == 0)
+										match.setDataLayerVirtualLan((short)fsr.getInt(VLAN));
+									
+									if ((wildcards & FVMatch.OFPFW_DL_VLAN_PCP) == 0)
+										match.setDataLayerVirtualLanPriorityCodePoint((byte)fsr.getInt(VPCP));
+									
+									if ((wildcards & FVMatch.OFPFW_DL_SRC) == 0)
+										match.setDataLayerSource(fsr.getLong(DLSRC));
+									
+									if ((wildcards & FVMatch.OFPFW_DL_DST) == 0)
+										match.setDataLayerDestination(fsr.getLong(DLDST));
+									
+									if ((wildcards & FVMatch.OFPFW_DL_TYPE) == 0)
+										match.setDataLayerType((short)fsr.getInt(DLTYPE));
+									
+									if ((wildcards & FVMatch.OFPFW_NW_SRC_ALL) == 0)
+										match.setNetworkSource(fsr.getInt(NWSRC));
+									
+									if ((wildcards & FVMatch.OFPFW_NW_DST_ALL) == 0)
+										match.setNetworkDestination(fsr.getInt(NWDST));
+									
+									if ((wildcards & FVMatch.OFPFW_NW_PROTO) == 0)
+										match.setNetworkProtocol((byte)fsr.getInt(NWPROTO));
+									
+									if ((wildcards & FVMatch.OFPFW_NW_TOS) == 0)
+										match.setNetworkTypeOfService((byte)fsr.getInt(NWTOS));
+									
+									if ((wildcards & FVMatch.OFPFW_TP_SRC) == 0)
+										match.setTransportSource((short)fsr.getInt(TPSRC));
+									
+									if ((wildcards & FVMatch.OFPFW_TP_DST) == 0)
+										match.setTransportDestination((short)fsr.getInt(TPDST));
+									
+									match.setWildcards(wildcards);
+									
+									List<BasicDBObject> actList = (ArrayList<BasicDBObject>) fsr.get(ACTION);
+									String sliceName = slice.getString(Slice.SLICE);
+									for (BasicDBObject action: actList) {
+										act = new SliceAction(sliceName, action.getInt(sliceName));
+										actionsList.add(act);
+									}
+									
+									List<Integer> queList = (ArrayList<Integer>) fsr.get(QUEUE);
+									for (Integer queue: queList) {
+										queueList.add(queue);
+									}
+									fe = new FlowEntry(fsr.getString(NAME), fsr.getLong(DPID), match, fsr_id, fsr.getInt(PRIO), actionsList);
+									//fe = new FlowEntry(fsr.getString(NAME), fsr.getLong(DPID), match, fsr.getInt(PRIO), actionsList);
+									fe.setQueueId(queueList);
+									fe.setForcedQueue(fsr.getInt(FORCED_QUEUE));
+									map.addRule(fe);
+								}
+							}
+						}
+					}
+				}
+			} finally {
+				FSRSelect.close();
+			}
+			if (fsr_id != -1)
+				fsrID = fsr_id + 1;
+			else 
+				fsrID = 1;
+			if (map == null) {
+				System.out.println("Let's try to be here now");
+				map = new FederatedFlowMap();	
+			}
+			return map;
+		} catch (UnknownHostException e) {
+			throw new ConfigError("Unable to retrieve flowmap from db : " + e.getMessage());
+		} 
+	}
+	
+	
 	@Override
 	public void setFlowMap(FlowMap map) throws ConfigError {
 		SortedSet<FlowEntry> rules = map.getRules();
@@ -460,6 +598,183 @@ public class FlowSpaceImpl implements FlowSpace {
 			
 		}	
 		
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public int mongoAddRule(FlowEntry fe) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		String queryCondition = "";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		boolean sliceFlag = false;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			int wildcards = -1;
+			int ruleid = -1;
+			
+			LinkedList<String> sliceNames = FVConfig.mongoGetAllSlices();
+			String FSRName = fe.getName();
+			
+			for (OFAction act: fe.getActionsList()) {
+				
+				String sliceName = ((SliceAction) act).getSliceName();
+				sliceFlag = false;
+				int slicePosition = 0;
+				for (String slice: sliceNames) {
+					
+					if (slice.equals(sliceName)) {
+						sliceFlag = true;
+						break;
+					}
+					slicePosition++;
+				}
+				
+				if (sliceFlag == true) {
+					
+					// Prepare a document to be updated or added
+					BasicDBObject FSRSet = new BasicDBObject();
+					wildcards = fe.getRuleMatch().getWildcards();
+					
+					FSRSet.put(DPID, fe.getDpid());
+					FSRSet.put(PRIO, fe.getPriority());
+					FSRSet.put(INPORT, fe.getRuleMatch().getInputPort());
+					
+					if ((wildcards & FVMatch.OFPFW_DL_VLAN) == 0)
+						FSRSet.put(VLAN, fe.getRuleMatch().getDataLayerVirtualLan());
+					
+					if ((wildcards & FVMatch.OFPFW_DL_VLAN_PCP) == 0)
+						FSRSet.put(VPCP, fe.getRuleMatch().getDataLayerVirtualLanPriorityCodePoint());
+					
+					if ((wildcards & FVMatch.OFPFW_DL_SRC) == 0)
+						FSRSet.put(DLSRC, FlowSpaceUtil.toLong(fe.getRuleMatch().getDataLayerSource()));
+					
+					if ((wildcards & FVMatch.OFPFW_DL_DST) == 0)
+						FSRSet.put(DLDST, FlowSpaceUtil.toLong(fe.getRuleMatch().getDataLayerDestination()));
+					
+					if ((wildcards & FVMatch.OFPFW_DL_TYPE) == 0)
+						FSRSet.put(DLTYPE, fe.getRuleMatch().getDataLayerType());
+					
+					if ((wildcards & FVMatch.OFPFW_NW_SRC_ALL) == 0)
+						FSRSet.put(NWSRC, fe.getRuleMatch().getNetworkSource());
+					
+					if ((wildcards & FVMatch.OFPFW_NW_DST_ALL) == 0)
+						FSRSet.put(NWDST, fe.getRuleMatch().getNetworkDestination());
+					
+					if ((wildcards & FVMatch.OFPFW_NW_PROTO) == 0)
+						FSRSet.put(NWPROTO, fe.getRuleMatch().getNetworkProtocol());
+					
+					if ((wildcards & FVMatch.OFPFW_NW_TOS) == 0)
+						FSRSet.put(NWTOS, fe.getRuleMatch().getNetworkTypeOfService());
+					
+					if ((wildcards & FVMatch.OFPFW_TP_SRC) == 0)
+						FSRSet.put(TPSRC, fe.getRuleMatch().getTransportSource());
+					
+					if ((wildcards & FVMatch.OFPFW_TP_DST) == 0)
+						FSRSet.put(TPDST, fe.getRuleMatch().getTransportDestination());
+					
+					FSRSet.put(FORCED_QUEUE, (int)fe.getForcedQueue());
+					FSRSet.put(WILDCARDS, wildcards);
+					FSRSet.put(NAME, FSRName);
+					
+					List<BasicDBObject> actionList = new ArrayList<BasicDBObject>();
+					BasicDBObject actionSet = new BasicDBObject();
+					actionSet.put(sliceName, ((SliceAction) act).getSlicePerms());
+					actionList.add(actionSet);
+					FSRSet.put(ACTION, actionList);
+					
+					List<Integer> queueList = new ArrayList<Integer>();
+					for (Integer queue_id: fe.getQueueId()) {
+						queueList.add(queue_id);
+					}
+					FSRSet.put(QUEUE, queueList);
+					
+					// Find the unique combination of sliceName with certain FSRName
+					String clauseCondition1 = Slice.SLICE;
+					String clauseCondition2 = FS + "." + NAME; 
+				
+					BasicDBObject queryClause1 = new BasicDBObject(clauseCondition1, sliceName);
+					BasicDBObject queryClause2 = new BasicDBObject(clauseCondition2, FSRName);
+					
+					BasicDBList compositeQuery = new BasicDBList();
+					compositeQuery.add(queryClause1);
+					compositeQuery.add(queryClause2);
+					
+					BasicDBObject searchQuery = new BasicDBObject();
+					BasicDBObject FSRQuery = new BasicDBObject("$and", compositeQuery);
+					BasicDBObject FSRMatch = new BasicDBObject("$elemMatch", FSRQuery);
+					BasicDBObject FSRFields = new BasicDBObject(Slice.TSLICE, FSRMatch).append("_id", false); 
+					
+					DBCursor FSRSelect = flowvisorColl.find(searchQuery, FSRFields);
+					
+					try {
+						while (FSRSelect.hasNext()) {
+							List<BasicDBObject> sliceList = (ArrayList<BasicDBObject>) FSRSelect.next().get(Slice.TSLICE); 
+						
+							if (sliceList != null) {
+								// I can't think of a better way to update FSR array right now (this is a performance bottleneck)
+								int FSRPosition = 0;
+								for (BasicDBObject slice: sliceList) {
+									List<BasicDBObject> FSRList = (ArrayList<BasicDBObject>) slice.get(FS); 
+									for (BasicDBObject fsr: FSRList) {
+										if (fsr.getString(NAME).equals(FSRName)) {
+											ruleid = fsr.getInt("id");
+											break;
+										}
+										FSRPosition++;
+									}
+								}
+					
+								FSRSet.put("id", ruleid);
+								
+								String slicePos = String.valueOf(slicePosition);
+								String FSRPos = String.valueOf(FSRPosition);
+								String updateField = Slice.TSLICE + "." + slicePos + "." + FS + "." + FSRPos;
+								queryCondition = Slice.TSLICE + "." + Slice.SLICE;
+								
+								// Update existing FSR
+								BasicDBObject UpdateQuery = new BasicDBObject(queryCondition, sliceName);
+								BasicDBObject FSRUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, FSRSet));
+								
+								flowvisorColl.update(UpdateQuery, FSRUpdate);
+							} else {
+							
+								System.out.println("fsrID in addRule: " + fsrID);
+								
+								ruleid = fsrID;
+								FSRSet.put("id", ruleid);
+								fsrID++;
+								
+								String updateField = Slice.TSLICE + ".$." + FS;
+								queryCondition = Slice.TSLICE + "." + Slice.SLICE;
+								
+								// Add new FSR
+								BasicDBObject UpdateQuery = new BasicDBObject(queryCondition, sliceName);
+								BasicDBObject FSRUpdate = new BasicDBObject("$push", new BasicDBObject(updateField, FSRSet));
+								
+								flowvisorColl.update(UpdateQuery, FSRUpdate);
+							}
+						}
+					} finally {
+						FSRSelect.close();
+					}
+				} else {
+					FVLog.log(LogLevel.WARN, null, "Slice name " + sliceName + " does not exist... skipping.");
+					// Actually we should not continue, this is a crucial error
+					//continue;
+				}
+			}
+			return ruleid;
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.DEBUG, null, e.getMessage());
+			throw new ConfigError("Unable to set the flowmap in db");
+		} 
 	}
 	
 	
@@ -805,7 +1120,44 @@ public class FlowSpaceImpl implements FlowSpace {
 		return map;
 	}
 	
-
+	@Override
+	public HashMap<String, Object> mongoToJson(HashMap<String, Object> output) {
+  		
+		String mongo;
+		String FlowSpaceRule = "FlowSpaceRule"; // This will go once we have consistency in the naming
+		DB conn = null;
+		DBCollection flowSpaceRuleColl = null;
+		LinkedList<Object> list = new LinkedList<Object>();
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowSpaceRuleColl = conn.getCollection(FlowSpaceRule);
+			
+			if (flowSpaceRuleColl.getCount() != 0) {
+				
+				BasicDBObject flowSpaceRuleQuery = new BasicDBObject();
+				BasicDBObject flowSpaceRuleFields = new BasicDBObject().append("_id", false);
+				DBCursor flowSpaceRuleSelect = flowSpaceRuleColl.find(flowSpaceRuleQuery, flowSpaceRuleFields);
+		
+				try {
+					while (flowSpaceRuleSelect.hasNext()) {
+						
+						list.add(flowSpaceRuleSelect.next().toMap());
+						output.put(FlowSpaceRule, list);
+					}
+				} finally {
+					flowSpaceRuleSelect.close();
+				}
+				
+			} else {
+				output.put(FlowSpaceRule, list);
+			}
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.CRIT, null, "Failed to write mongo flowspace config : " + e.getMessage());
+		}
+		return output;
+	}
 	
 
 	/*
@@ -992,8 +1344,12 @@ public class FlowSpaceImpl implements FlowSpace {
 			processAlter("ALTER TABLE FlowSpaceRule ADD COLUMN " + NAME + " VARCHAR(64)");
 			version++;
 		}
-		
-		
 	}
 
+	@Override
+	public void mongoFromJson(ArrayList<HashMap<String, Object>> input)
+			throws IOException {
+		// TODO Auto-generated method stub
+		
+	}
 }

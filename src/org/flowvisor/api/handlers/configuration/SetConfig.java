@@ -22,8 +22,6 @@ import com.thetransactioncompany.jsonrpc2.JSONRPC2Response;
 
 public class SetConfig implements ApiHandler<Map<String, Object>> {
 
-	
-	
 	@Override
 	public JSONRPC2Response process(Map<String, Object> params) {
 		JSONRPC2Response resp = null;
@@ -38,21 +36,28 @@ public class SetConfig implements ApiHandler<Map<String, Object>> {
 				processFMLimit(fmlimit);
 			
 			Boolean track = HandlerUtils.<Boolean>fetchField(TRACK, params, false, null);
-			if (track != null)
-				FlowvisorImpl.getProxy().settrack_flows(track);
+			if (track != null) {
+				//FlowvisorImpl.getProxy().settrack_flows(track);
+				FlowvisorImpl.getProxy().mongoSetTrackFlows(track);
+			}
 			
 			Boolean stats = HandlerUtils.<Boolean>fetchField(STATSDESC, params, false, null);
-			if (stats != null)
-				FlowvisorImpl.getProxy().setstats_desc_hack(stats);
-			
+			if (stats != null) {
+				//FlowvisorImpl.getProxy().setstats_desc_hack(stats);
+				FlowvisorImpl.getProxy().mongoSetStatsDescHack(stats);
+			}
+
 			Boolean topo = HandlerUtils.<Boolean>fetchField(TOPOCTRL, params, false, null);
-			if (topo != null)
-				FlowvisorImpl.getProxy().setTopologyServer(topo);
-			
+			if (topo != null) {
+				//FlowvisorImpl.getProxy().setTopologyServer(topo);
+				FlowvisorImpl.getProxy().mongoSetTopologyServer(topo);
+			}
+	
 			Number fscache = HandlerUtils.<Number>fetchField(FSCACHE, params, false, null);
-			if (fscache != null)
-				FlowvisorImpl.getProxy().setFlowStatsCache(fscache.intValue());
-			
+			if (fscache != null) {
+				//FlowvisorImpl.getProxy().setFlowStatsCache(fscache.intValue());
+				FlowvisorImpl.getProxy().mongoSetFlowStatsCache(fscache.intValue());
+			}
 			
 			resp = new JSONRPC2Response(true, 0);
 		} catch (ConfigError e) {
@@ -71,54 +76,55 @@ public class SetConfig implements ApiHandler<Map<String, Object>> {
 		return resp;
 		
 	}
-
-
+	
     private void processFMLimit(Map<String, Object> fmlimit) 
     		throws ClassCastException, MissingRequiredField, ConfigError {
     	String sliceName = HandlerUtils.<String>fetchField(SLICENAME, fmlimit, true, null);
     	Long dpid = FlowSpaceUtil.parseDPID(
     			HandlerUtils.<String>fetchField(FlowSpace.DPID, fmlimit, true, null));
     	Number limit = HandlerUtils.<Number>fetchField(FMLIMIT, fmlimit, true, null);
-    	if (dpid == FlowEntry.ALL_DPIDS) 
-    		SliceImpl.getProxy().setMaxFlowMods(sliceName, limit.intValue());
-    	else
-    		SwitchImpl.getProxy().setMaxFlowMods(sliceName, dpid, limit.intValue());
+    	if (dpid == FlowEntry.ALL_DPIDS) {
+    		//SliceImpl.getProxy().setMaxFlowMods(sliceName, limit.intValue());
+    		SliceImpl.getProxy().mongoSetMaxFlowMods(sliceName, limit.intValue());
+    	}
+    	else {
+    		//SwitchImpl.getProxy().setMaxFlowMods(sliceName, dpid, limit.intValue());
+    		SwitchImpl.getProxy().mongoSetMaxFlowMods(sliceName, dpid, limit.intValue());
+    	}
 	}
-
 
 	private void processFloodPerm(Map<String, Object> floodperm) 
 			throws ClassCastException, MissingRequiredField, PermissionDeniedException, ConfigError {
 		String sliceName = HandlerUtils.<String>fetchField(SLICENAME, floodperm, true, null);
 		validateSliceName(sliceName);
 		String dpidStr = HandlerUtils.<String>fetchField(FlowSpace.DPID, floodperm, false, null);
-		if (dpidStr != null)
-			SwitchImpl.getProxy().setFloodPerm(FlowSpaceUtil.parseDPID(dpidStr), sliceName);
-		else
-			FlowvisorImpl.getProxy().setFloodPerm(sliceName);
+		if (dpidStr != null){
+			//SwitchImpl.getProxy().setFloodPerm(FlowSpaceUtil.parseDPID(dpidStr), sliceName);
+			SwitchImpl.getProxy().mongoSetFloodPerm(FlowSpaceUtil.parseDPID(dpidStr), sliceName);
+		}
+		else {
+			//FlowvisorImpl.getProxy().setFloodPerm(sliceName);
+			FlowvisorImpl.getProxy().mongoSetFloodPerm(sliceName);
+		}
 	}
-
-
-	
 
 	private void validateSliceName(String sliceName)
 		throws ConfigError, PermissionDeniedException {
-		List<String> slices = FVConfig.getAllSlices();
+		//List<String> slices = FVConfig.getAllSlices();
+		List<String> slices =  FVConfig.mongoGetAllSlices();
 		if (!slices.contains(sliceName))
 			throw new PermissionDeniedException(
 					"Slice " + sliceName + " does not exist");
 	
 	}
 
-
 	@Override
 	public JSONRPC2ParamsType getType() {
 		return JSONRPC2ParamsType.OBJECT;
 	}
 
-
 	@Override
 	public String cmdName() {
 		return "set-config";
 	}
-
 }

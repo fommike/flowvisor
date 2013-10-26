@@ -103,8 +103,6 @@ public class AddFlowSpace implements ApiHandler<List<Map<String, Object>>> {
 		
 	}
 	
-	
-
 	private List<OFAction> parseSliceActions(List<Map<String, Object>> sactions) 
 			throws ClassCastException, MissingRequiredField, SliceNotFound {
 		FVLog.log(LogLevel.DEBUG, null,

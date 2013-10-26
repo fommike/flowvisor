@@ -25,7 +25,7 @@ public class RemoveFlowSpace implements ApiHandler<List<String>> {
 					cmdName() + ": Nothing to remove"), 0);
 		JSONRPC2Response resp = null;
 		try {
-			final FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			final FlowMap flowSpace = FVConfig.mongoGetFlowSpaceFlowMap(); // getFlowSpaceFlowMap();
 			for (String name : params) {
 				flowSpace.removeRule(flowSpace.findRuleByName(name).getId());
 			}

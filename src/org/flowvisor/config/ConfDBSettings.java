@@ -1,7 +1,10 @@
 package org.flowvisor.config;
 
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.SQLException;
+
+import com.mongodb.DB;
 
 
 /**
@@ -36,11 +39,16 @@ public interface ConfDBSettings {
 	 */
 	public Connection getConnection(String user, String pass) throws SQLException;
 	
-	
-	
 	/**
 	 * Shutdown the data repository cleanly.
 	 */
 	public void shutdown();
+	
+	/**
+	 * Playing around with MongoDB
+	 */
+	public DB getMongoConnection()throws UnknownHostException;
+	
+	public void mongoShutdown();
 	
 }

@@ -96,8 +96,8 @@ public class FVConfigurationController {
 	
 	public void shutdown() {
 		settings.shutdown();
+		settings.mongoShutdown();
 		fsHandler.shutdown();
-		
 	}
 
 	public String flowSpaceStatus(Integer id) {

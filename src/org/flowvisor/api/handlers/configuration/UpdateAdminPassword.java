@@ -36,7 +36,8 @@ public class UpdateAdminPassword implements ApiHandler<Map<String, Object>> {
 			String salt = APIAuth.getSalt();
 			String crypt = APIAuth.makeCrypt(salt, newPasswd);
 			sliceName = FVConfig.sanitize(sliceName);
-			SliceImpl.getProxy().setPasswd(sliceName, salt, crypt);
+			//SliceImpl.getProxy().setPasswd(sliceName, salt, crypt);
+			SliceImpl.getProxy().mongoSetPasswd(sliceName, salt, crypt);
 			resp = new JSONRPC2Response(true, 0);
 		}  catch (ClassCastException e) {
 			resp = new JSONRPC2Response(new JSONRPC2Error(JSONRPC2Error.INVALID_PARAMS.getCode(), 
@@ -59,7 +60,7 @@ public class UpdateAdminPassword implements ApiHandler<Map<String, Object>> {
 
 	@Override
 	public String cmdName() {
-		return "update-slice-password";
+		return "update-admin-password";
 	}
 
 }

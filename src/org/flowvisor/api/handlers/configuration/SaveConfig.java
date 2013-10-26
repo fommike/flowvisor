@@ -13,11 +13,8 @@ public class SaveConfig implements ApiHandler<Object> {
 	
 	@Override
 	public JSONRPC2Response process(Object params) {
-	
-			
-		return new JSONRPC2Response(FVConfig.getConfig(), 0);
-		
-		
+		//return new JSONRPC2Response(FVConfig.getConfig(), 0);
+		return new JSONRPC2Response(FVConfig.mongoGetConfig(), 0);
 	}
 
 	@Override

@@ -1,6 +1,7 @@
 package org.flowvisor.config;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -9,10 +10,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 
-
 import org.flowvisor.FlowVisor;
+import org.flowvisor.api.APIAuth;
 import org.flowvisor.log.FVLog;
 import org.flowvisor.log.LogLevel;
+
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
 
 
 
@@ -26,8 +34,6 @@ public class FlowvisorImpl implements Flowvisor {
 	private static String FTRACK = "setFlowTracking";
 	private static String FSTATS = "setStatsDescHack";
 	private static String FFLOOD = "setFloodPerm";
-	
-	 
 	
 	// STATEMENTS
 	private static String GALL = "SELECT * FROM Flowvisor";
@@ -106,6 +112,39 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
+	public Boolean mongoGetTrackFlows() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(TRACK, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Boolean queryResult = (Boolean) flowvisorSelect.next().get(TRACK);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Track flows not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	@Override
 	public Integer getListenPort(Integer id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -135,6 +174,40 @@ public class FlowvisorImpl implements Flowvisor {
 		return getListenPort(1);
 	}
 	
+	@Override
+	public Integer mongoGetListenPort() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(LISTEN, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Integer queryResult = (Integer) flowvisorSelect.next().get(LISTEN);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Listen port not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	@Override
 	public Boolean getCheckPoint(Integer id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -161,6 +234,39 @@ public class FlowvisorImpl implements Flowvisor {
 	
 	public Boolean getCheckPoint() throws ConfigError {
 		return getCheckPoint(1);
+	}
+	
+	@Override
+	public Boolean mongoGetCheckPoint() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(CHECKPOINT, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Boolean queryResult = (Boolean) flowvisorSelect.next().get(CHECKPOINT);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Checkpointing not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
 	}
 
 	@Override
@@ -191,6 +297,39 @@ public class FlowvisorImpl implements Flowvisor {
 		return getstats_desc_hack(1);
 	}
 	
+	@Override
+	public Boolean mongoGetStatsDescHack() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(STATS, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Boolean queryResult = (Boolean) flowvisorSelect.next().get(STATS);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Stats desc hack not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
 	public Integer getAPIWSPort(Integer id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -215,10 +354,45 @@ public class FlowvisorImpl implements Flowvisor {
 		}
 		return null;
 	}
+	
 	public Integer getAPIWSPort() throws ConfigError {
 		return getAPIWSPort(1);
 	}
 
+	@Override
+	public Integer mongoGetAPIWSPort() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(APIPORT, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Integer queryResult = (Integer) flowvisorSelect.next().get(APIPORT);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("API Webserver port not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	
 	public Integer getJettyPort(Integer id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -249,6 +423,39 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
+	public Integer mongoGetJettyPort() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(JETTYPORT, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Integer queryResult = (Integer) flowvisorSelect.next().get(JETTYPORT);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("API Jetty Webserver port not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	@Override
 	public String getFloodPerm(Integer id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -272,11 +479,42 @@ public class FlowvisorImpl implements Flowvisor {
 		return null;
 	}
 	
-	
-	
 	@Override
 	public String getFloodPerm() throws ConfigError {
 		return getFloodPerm(1);
+	}
+	
+	@Override
+	public String mongoGetFloodPerm() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(FLOODPERM, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					String queryResult = (String) flowvisorSelect.next().get(FLOODPERM);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Default flood permissions not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
 	}
 	
 	@Override
@@ -310,6 +548,40 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
+	public String mongoGetLogIdent() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(LOGIDENT, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					String queryResult = (String) flowvisorSelect.next().get(LOGIDENT);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Log indent not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	
+	@Override
 	public String getLogging(Integer id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -337,6 +609,39 @@ public class FlowvisorImpl implements Flowvisor {
 	@Override
 	public String getLogging() throws ConfigError{
 		return getLogging(1);
+	}
+	
+	@Override
+	public String mongoGetLogging() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(LOGGING, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					String queryResult = (String) flowvisorSelect.next().get(LOGGING);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Logging not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
 	}
 	
 	@Override
@@ -370,6 +675,39 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
+	public String mongoGetLogFacility() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(LOGFACILITY, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					String queryResult = (String) flowvisorSelect.next().get(LOGFACILITY);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Log facility found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
+	@Override
 	public Boolean getTopologyServer(int id) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -399,6 +737,39 @@ public class FlowvisorImpl implements Flowvisor {
 		return getTopologyServer(1);
 	}
 	
+	@Override
+	public Boolean mongoGetTopologyServer() throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(TOPO, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Boolean queryResult = (Boolean) flowvisorSelect.next().get(TOPO);
+					if (queryResult != null)
+						return queryResult;
+					else
+						throw new ConfigError("Topology server not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
+	
 	
 	@Override
 	public Integer getFlowStatsCache() throws ConfigError {
@@ -424,6 +795,38 @@ public class FlowvisorImpl implements Flowvisor {
 		}
 		return null;
 	}
+	
+	@Override
+	public Integer mongoGetFlowStatsCache() throws ConfigError {
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(FSCACHE, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Integer queryResult = (Integer) flowvisorSelect.next().get(FSCACHE);
+					if (queryResult != null) 
+						return queryResult;
+					else 
+						throw new ConfigError("Flowstats cache timeout value not found!");
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
 
 	@Override
 	public void setFlowStatsCache(Integer timer) throws ConfigError {
@@ -445,6 +848,28 @@ public class FlowvisorImpl implements Flowvisor {
 			close(ps);
 			close(conn);	
 		}	
+	}
+	
+	@Override
+	public void mongoSetFlowStatsCache(Integer timer) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(FSCACHE, timer));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+			throw new ConfigError("Unable to update flow stats timer setting!");
+		} 
 		
 	}
 	
@@ -476,6 +901,27 @@ public class FlowvisorImpl implements Flowvisor {
 		setTopologyServer(1, topo);
 	}
 	
+	@Override
+	public void mongoSetTopologyServer(Boolean topo) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(TOPO, topo));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+			throw new ConfigError("Unable to update topology server setting!");
+		} 
+	}
 	
 	@Override
 	public void setFloodPerm(Integer id, String floodPerm) {
@@ -504,6 +950,30 @@ public class FlowvisorImpl implements Flowvisor {
 	public void setFloodPerm(String floodPerm){
 		setFloodPerm(1, floodPerm);
 	}
+	
+	@Override
+	public void mongoSetFloodPerm(String floodPerm) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(FLOODPERM, floodPerm));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+			notify(ChangedListener.FLOWVISOR, FFLOOD, floodPerm);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+	
 	
 	@Override
 	public void settrack_flows(Integer id, Boolean track_flows) {
@@ -535,6 +1005,30 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 
 	@Override
+	public void mongoSetTrackFlows(Boolean track_flows) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(TRACK, track_flows));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+			notify(ChangedListener.FLOWVISOR, FTRACK, track_flows);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+	
+	
+	@Override
 	public void setstats_desc_hack(Integer id, Boolean stats_desc_hack) {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -562,6 +1056,29 @@ public class FlowvisorImpl implements Flowvisor {
 		setstats_desc_hack(1, stats_desc_hack);
 	}
 	
+	@Override
+	public void mongoSetStatsDescHack(Boolean stats_desc_hack) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(STATS, stats_desc_hack));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+			
+			notify(ChangedListener.FLOWVISOR, FSTATS, stats_desc_hack);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 	
+	}
+	
 	public void setLogging(Integer id, String logging) {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -585,6 +1102,27 @@ public class FlowvisorImpl implements Flowvisor {
 	@Override
 	public void setLogging(String logging) {
 		setLogging(1, logging);
+	}
+	
+	@Override
+	public void mongoSetLogging(String logging) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(LOGGING, logging));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 	
 	}
 
 	@Override
@@ -615,6 +1153,27 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
+	public void mongoSetLogFacility(String logging) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(LOGFACILITY, logging));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+	
+	@Override
 	public void setLogIdent(Integer id, String logging) {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -642,6 +1201,27 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
+	public void mongoSetLogIdent(String logging) {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(LOGIDENT, logging));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+	
+	@Override
 	public void setListenPort(Integer id, Integer port) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
@@ -664,10 +1244,31 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
-	public void setAPIWSPort(Integer port) throws ConfigError{
-		setAPIWSPort(1, port);
+	public void setListenPort(Integer port) throws ConfigError{
+		setListenPort(1, port);
 	}
 	
+	@Override
+	public void mongoSetListenPort(Integer port) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(LISTEN, port));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+		
 	@Override
 	public void setAPIWSPort(Integer id, Integer port) throws ConfigError {
 		Connection conn = null;
@@ -691,8 +1292,29 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
-	public void setJettyPort(Integer port) throws ConfigError{
-		setJettyPort(1, port);
+	public void setAPIWSPort(Integer port) throws ConfigError{
+		setAPIWSPort(1, port);
+	}
+	
+	@Override
+	public void mongoSetAPIWSPort(Integer port) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(APIPORT, port));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 	}
 	
 	@Override
@@ -718,8 +1340,29 @@ public class FlowvisorImpl implements Flowvisor {
 	}
 	
 	@Override
-	public void setListenPort(Integer port) throws ConfigError{
-		setListenPort(1, port);
+	public void setJettyPort(Integer port) throws ConfigError{
+		setJettyPort(1, port);
+	}
+	
+	@Override
+	public void mongoSetJettyPort(Integer port) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorUpdate = new BasicDBObject("$set", new BasicDBObject(JETTYPORT, port));
+			flowvisorColl.update(flowvisorQuery, flowvisorUpdate);
+		
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 	}
 	
 	@Override
@@ -795,6 +1438,7 @@ public class FlowvisorImpl implements Flowvisor {
 				fv.clear();
 			}
 			output.put(FLOWVISOR, list);
+			//System.out.println("list: " + list);
 				
 		} catch (SQLException e) {
 			FVLog.log(LogLevel.WARN, null, "Failed to write Flowvisor base config : " + e.getMessage());
@@ -806,7 +1450,40 @@ public class FlowvisorImpl implements Flowvisor {
 		}
 		return output;
 	}
+	
+	// Mongo change
+	public  HashMap<String, Object> mongoToJson(HashMap<String, Object> output) {
 
+		String mongo;
+		String Flowvisor = "Flowvisor"; // This will go once we have consistency in the naming
+		//String Slice = "Slice";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		LinkedList<Object> list = new LinkedList<Object>();
+	
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+	
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject().append("_id", false).append("fscache", false);//.append(Slice, false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while(flowvisorSelect.hasNext()) {
+					list.add(flowvisorSelect.next());
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+			output.put(Flowvisor, list);	
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, "Failed to write mongo Flowvisor base config : " + e.getMessage());
+		}
+		return output;
+	}
+	
 	@Override
 	public void fromJson(ArrayList<HashMap<String, Object>> list) throws IOException {
 		deleteAll();
@@ -895,13 +1572,12 @@ public class FlowvisorImpl implements Flowvisor {
 			
 			if (row.get(CONFIG) == null)
 				row.put(CONFIG, "default");
-			
 			ps.setString(14, (String) row.get(CONFIG));
 			
 			if (row.get(DB_VERSION) == null)
 				row.put(DB_VERSION, new Double(FlowVisor.FLOWVISOR_DB_VERSION));
-			
 			ps.setInt(15, ((Double) row.get(DB_VERSION)).intValue()); 
+			
 			if (ps.executeUpdate() == 0)
 				FVLog.log(LogLevel.WARN, null, "Insertion failed... siliently.");
 			} catch (SQLException e) {
@@ -929,6 +1605,181 @@ public class FlowvisorImpl implements Flowvisor {
 			close(ps);
 			close(conn);
 		}
+	}
+	
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public void mongoFromJson(ArrayList<HashMap<String, Object>> list) throws IOException {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor"; // This will go once we have consistency in the naming
+		//String Slice = "Slice";
+		String Switch = "Switch";
+		String FlowSpaceRule = "FlowSpaceRule";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+						
+			if (list.size() == 0) {
+				
+				LoadConfig.defaultMongoConfig("");
+			} else {
+				
+				flowvisorColl = conn.getCollection(Flowvisor);
+				flowvisorColl.drop();
+				flowvisorColl = conn.getCollection(Flowvisor);
+				
+				ArrayList<DBObject> flowvisorList = new ArrayList<DBObject>();
+				
+				//System.out.println(list.size());
+					
+				for (HashMap<String, Object> row : list) {
+					
+					BasicDBObject flowvisorSet = new BasicDBObject();
+					
+					if (row.get(APIPORT) == null)
+						row.put(APIPORT, new Double(8080));
+					flowvisorSet.put(APIPORT, ((Double) row.get(APIPORT)).intValue());
+					
+					if (row.get(DB_VERSION) == null)
+						row.put(DB_VERSION, new Double(FlowVisor.FLOWVISOR_DB_VERSION));
+					flowvisorSet.put(DB_VERSION, ((Double) row.get(DB_VERSION)).intValue());
+					
+					if (row.get(HOST) == null)
+						row.put(HOST, "localhost");
+					flowvisorSet.put(HOST, (String) row.get(HOST));
+					
+					if (row.get(LOGIDENT) == null)
+						row.put(LOGIDENT, "flowvisor");
+					flowvisorSet.put(LOGIDENT, (String) row.get(LOGIDENT));
+				
+					if (row.get(CHECKPOINT) == null)
+						row.put(CHECKPOINT, false);
+					flowvisorSet.put(CHECKPOINT, (Boolean) row.get(CHECKPOINT));
+
+					if (row.get(LISTEN) == null)
+						row.put(LISTEN, new Double(6633));
+					flowvisorSet.put(LISTEN, ((Double) row.get(LISTEN)).intValue());
+					
+					if (row.get(LOGGING) == null)
+						row.put(LOGGING, "NOTE");
+					flowvisorSet.put(LOGGING, (String) row.get(LOGGING));
+					
+					if (row.get(TOPO) == null)
+						row.put(TOPO, false);
+					flowvisorSet.put(TOPO, (Boolean) row.get(TOPO));
+					
+					if (row.get(LOGFACILITY) == null)
+						row.put(LOGFACILITY, "LOG_LOCAL7");
+					flowvisorSet.put(LOGFACILITY, (String) row.get(LOGFACILITY));
+					
+					if (row.get(VERSION) == null)
+						row.put(VERSION, FlowVisor.FLOWVISOR_VERSION);
+					flowvisorSet.put(VERSION, (String) row.get(VERSION));
+					
+					if (row.get(CONFIG) == null)
+						row.put(CONFIG, "default");
+					flowvisorSet.put(CONFIG, (String) row.get(CONFIG));
+					
+					if (row.get(JETTYPORT) == null)
+						row.put(JETTYPORT, new Double(8081));
+					flowvisorSet.put(JETTYPORT, ((Double) row.get(JETTYPORT)).intValue());
+			
+					if (row.get(FLOODPERM) == null)
+						row.put(FLOODPERM, "fvadmin");
+					flowvisorSet.put(FLOODPERM, (String) row.get(FLOODPERM));	
+					
+					if (row.get(TRACK) == null)
+						row.put(TRACK, false);
+					flowvisorSet.put(TRACK, (Boolean) row.get(TRACK));
+				
+					if (row.get(STATS) == null)
+						row.put(STATS, false);
+					flowvisorSet.put(STATS, (Boolean) row.get(STATS));
+					
+					if (row.get(FSCACHE) == null) 
+						row.put(FSCACHE, new Double(30));
+					flowvisorSet.put(FSCACHE, ((Double) row.get(FSCACHE)).intValue());
+					
+					if (row.get("Slice") == null) {
+						
+						ArrayList<BasicDBObject> sliceList = LoadConfig.defaultSlice();
+						flowvisorSet.put("Slice", sliceList);
+					} else {
+						
+						ArrayList<HashMap<String, Object>> iterList = (ArrayList<HashMap<String, Object>>) row.get("Slice");
+						ArrayList<BasicDBObject> sliceList = new ArrayList<BasicDBObject>();
+						
+						for (HashMap<String, Object> sliceRow : iterList) {
+							
+							BasicDBObject sliceSet = new BasicDBObject();
+							
+							sliceSet.put(Slice.EMAIL, (String) sliceRow.get(Slice.EMAIL));
+							
+							if (sliceRow.get(Slice.ADMINDOWN) == null)
+								sliceRow.put(Slice.ADMINDOWN, true);
+							sliceSet.put(Slice.ADMINDOWN, (Boolean) sliceRow.get(Slice.ADMINDOWN));
+						
+							sliceSet.put(Slice.CREATOR, (String) sliceRow.get(Slice.CREATOR));
+							sliceSet.put(Slice.SALT, (String) sliceRow.get(Slice.SALT));
+							
+							if (sliceRow.get(Slice.DROP) == null)
+								sliceRow.put(Slice.DROP, "exact");
+							sliceSet.put(Slice.DROP, (String) sliceRow.get(Slice.DROP));
+							
+							if (sliceRow.get(Slice.FMLIMIT) == null)
+								sliceRow.put(Slice.FMLIMIT, new Double(-1));
+							sliceSet.put(Slice.FMLIMIT, ((Double) sliceRow.get(Slice.FMLIMIT)).intValue());
+			
+							sliceSet.put(Slice.SLICE, (String) sliceRow.get(Slice.SLICE));
+							sliceSet.put(Slice.PORT, ((Double) sliceRow.get(Slice.PORT)).intValue());
+							sliceSet.put(Slice.HOST, (String) sliceRow.get(Slice.HOST));
+							sliceSet.put(Slice.FMTYPE, (String) sliceRow.get(Slice.FMTYPE));
+							sliceSet.put(Slice.CRYPT, (String) sliceRow.get(Slice.CRYPT));
+							
+							if (sliceRow.get(Slice.LLDP) == null) 
+								sliceRow.put(Slice.LLDP, true);
+							sliceSet.put(Slice.LLDP, (Boolean)sliceRow.get(Slice.LLDP));
+							///*
+							if (sliceRow.get(FlowSpaceRule) == null) {
+								
+								ArrayList<BasicDBObject> FSRList = new ArrayList<BasicDBObject>();
+								sliceSet.put(FlowSpaceRule, FSRList);
+							} else {
+		
+								sliceSet.put(FlowSpaceRule, (ArrayList<BasicDBObject>)sliceRow.get(FlowSpaceRule));
+								// This will be fun
+							}
+							//*/
+							
+							sliceList.add(sliceSet);
+						}
+						
+						flowvisorSet.put("Slice", sliceList);
+					}
+					///*
+					if (row.get("Switch") == null) {
+						
+						ArrayList<BasicDBObject> switchList = new ArrayList<BasicDBObject>();
+						flowvisorSet.put("Switch", switchList);
+					} else {
+						
+						flowvisorSet.put("Switch", (ArrayList<BasicDBObject>)row.get(Switch));
+						// This also will be fun
+					}
+					
+					flowvisorList.add(flowvisorSet);
+					//*/
+				}
+				
+				flowvisorColl.insert(flowvisorList);
+			}
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}	
 	}
 	
 	private void processAlter(String alter) {
@@ -1005,10 +1856,43 @@ public class FlowvisorImpl implements Flowvisor {
 			close(ps);
 			close(conn);
 		}
-		
 		return 0;
 	}
 
-	
+	@Override
+	public int mongoFetchDBVersion() {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject flowvisorQuery = new BasicDBObject();
+			BasicDBObject flowvisorFields = new BasicDBObject(DB_VERSION, 1).append("_id", false);
+			DBCursor flowvisorSelect = flowvisorColl.find(flowvisorQuery, flowvisorFields);
+			
+			try {
+				while (flowvisorSelect.hasNext()) {
+					Integer queryResult = (Integer) flowvisorSelect.next().get(DB_VERSION);
+					if (queryResult != null)
+						return queryResult;
+					else {
+						System.err.println("Database empty, assuming latest DB Version!");
+						return FlowVisor.FLOWVISOR_DB_VERSION;
+					}
+						
+				}
+			} finally {
+				flowvisorSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return 0;
+	}
 
 }

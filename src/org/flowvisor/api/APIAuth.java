@@ -156,7 +156,7 @@ public class APIAuth implements AuthenticationHandler {
 			if (user.equals(changerSlice))
 				return true;
 			try {
-				user = FVConfig.getSliceCreator(sliceName); 
+				user = FVConfig.mongoGetSliceCreator(sliceName); // getSliceCreator(sliceName); 
 			} catch (ConfigError e) {
 				// FIXME: this config format is stupid
 				e.printStackTrace();
@@ -195,7 +195,7 @@ public class APIAuth implements AuthenticationHandler {
 		FVConfigurationController.init(new ConfDBHandler());
 		String salt = APIAuth.getSalt();
 		String crypt = APIAuth.makeCrypt(salt, passwd);
-		FVConfig.setPasswd(user, salt, crypt);
+		FVConfig.mongoSetPasswd(user, salt, crypt); // setPasswd(user, salt, crypt);
 		System.err.println("Writing config to " + filename);
 		FVConfig.writeToFile(filename);
 	}

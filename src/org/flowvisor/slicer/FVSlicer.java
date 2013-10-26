@@ -121,7 +121,7 @@ public class FVSlicer implements FVEventHandler, FVSendMsg, FlowvisorChangedList
 		
 		FlowvisorImpl.addListener(this);//FVConfig.watch(this, FVConfig.FLOW_TRACKING);
 		try {
-			setFlowTracking(FlowvisorImpl.getProxy().gettrack_flows());
+			setFlowTracking(FlowvisorImpl.getProxy().mongoGetTrackFlows()); // gettrack_flows()
 		} catch (ConfigError e) {
 			setFlowTracking(false);
 		}
@@ -149,9 +149,9 @@ public class FVSlicer implements FVEventHandler, FVSendMsg, FlowvisorChangedList
 		
 		// snag controller info from config
 		try {
-			hostname = FVConfig.getSliceHost(sliceName);
-			port = FVConfig.getSlicePort(sliceName); 
-			lldpOptIn = FVConfig.getLLDPSpam(sliceName);
+			hostname = FVConfig.mongoGetSliceHost(sliceName); // getSliceHost(sliceName);
+			port = FVConfig.mongoGetSlicePort(sliceName); // getSlicePort(sliceName);  
+			lldpOptIn = FVConfig.mongoGetLLDPSpam(sliceName); // getLLDPSpam(sliceName);
 			SliceImpl.addListener(sliceName, this);
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.CRIT, this, "ignoring slice ", sliceName,
@@ -166,7 +166,7 @@ public class FVSlicer implements FVEventHandler, FVSendMsg, FlowvisorChangedList
 		fvClassifier.loadLimit(sliceName);
 		fvClassifier.loadRateLimit(sliceName);
 		try {
-			this.fmlimit = SliceImpl.getProxy().getMaxFlowMods(sliceName);
+			this.fmlimit = SliceImpl.getProxy().mongoGetMaxFlowMods(sliceName); // getMaxFlowMods(sliceName);
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.WARN, this, "Global slice flow mod limit unreadable; disabling.");
 			this.fmlimit = -1;
@@ -830,7 +830,7 @@ public class FVSlicer implements FVEventHandler, FVSendMsg, FlowvisorChangedList
 	}
 
 	public boolean isUp() {
-		return SliceImpl.getProxy().isSliceUp(this.sliceName);
+		return SliceImpl.getProxy().mongoIsSliceUp(this.sliceName); //isSliceUp(this.sliceName);
 	}
 
 

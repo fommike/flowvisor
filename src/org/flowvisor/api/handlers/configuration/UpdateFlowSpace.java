@@ -65,7 +65,8 @@ public class UpdateFlowSpace implements ApiHandler<List<Map<String, Object>>> {
 		Integer priority = null;
 		FlowEntry update = null;
 		LinkedList<FlowEntry> list = new LinkedList<FlowEntry>();
-		FlowMap flowSpace = FlowSpaceImpl.getProxy().getFlowMap();
+		//FlowMap flowSpace = FlowSpaceImpl.getProxy().getFlowMap();
+		FlowMap flowSpace = FlowSpaceImpl.getProxy().mongoGetFlowMap();
 		for (Map<String,Object> fe : params) {
 			name = HandlerUtils.<String>fetchField(FSNAME, fe, false, null);
 			if (name == null)

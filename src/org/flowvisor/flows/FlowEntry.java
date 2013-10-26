@@ -190,7 +190,8 @@ public class FlowEntry implements Comparable<FlowEntry>, Cloneable,
 
 		try {
 			synchronized(FVConfig.class) {  // stop everyone from accessing flowmap for a second
-				FlowMap map = FVConfig.getFlowSpaceFlowMap();
+				//FlowMap map = FVConfig.getFlowSpaceFlowMap();
+				FlowMap map = FVConfig.mongoGetFlowSpaceFlowMap();
 				switch (map.getType()) {
 				case LINEAR:
 					for (FlowEntry flowEntry : map.getRules()) {

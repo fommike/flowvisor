@@ -78,8 +78,10 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		FVLog.log(LogLevel.DEBUG, null, "API listFlowSpace() by: " + sliceName);
 		FlowMap flowMap;
 		synchronized (FVConfig.class) {
-			if (FVConfig.isSupervisor(sliceName))
-				flowMap = FVConfig.getFlowSpaceFlowMap();
+			if (FVConfig.isSupervisor(sliceName)) {
+				//flowMap = FVConfig.getFlowSpaceFlowMap();
+				flowMap = FVConfig.mongoGetFlowSpaceFlowMap();
+			}
 			else
 				flowMap = FlowSpaceUtil.getSliceFlowSpace(sliceName);
 			return flowMap.getRules();
@@ -149,7 +151,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		List<String> slices = null;
 		synchronized (FVConfig.class) {
 			try {
-				slices = FVConfig.getAllSlices();
+				slices = FVConfig.mongoGetAllSlices(); // getAllSlices();
 			} catch (ConfigError e) {
 				e.printStackTrace();
 				throw new RuntimeException("no SLICES subdir found in config");
@@ -163,8 +165,8 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 				}
 			}
 		}
-
-		FVConfig.createSlice(sliceName, list[1], controller_port, drop_policy, passwd,
+		// createSlice(...)
+		FVConfig.mongoCreateSlice(sliceName, list[1], controller_port, drop_policy, passwd,
 				slice_email, APIUserCred.getUserName());
 		FlowVisor.getInstance().checkPointConfig();
 		return true;
@@ -192,7 +194,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		String crypt = APIAuth.makeCrypt(salt, newPasswd);
 		sliceName = FVConfig.sanitize(sliceName);
 		// set passwd is synchronized
-		FVConfig.setPasswd(sliceName, salt, crypt);
+		FVConfig.mongoSetPasswd(sliceName, salt, crypt); // setPasswd(sliceName, salt, crypt);
 		FlowVisor.getInstance().checkPointConfig();
 		return true;
 	}
@@ -215,29 +217,29 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		
 		try {
 			if (key.equals("contact_email"))
-				FVConfig.setSliceContactEmail(sliceName, value);
+				FVConfig.mongoSetSliceContactEmail(sliceName, value); // setSliceContactEmail(sliceName, value);
 			else if (key.equals("controller_hostname")){
 				// make sure there isn't already a slice with this hostname and port
 				// that this slice uses
-				if (isSecondSliceSharingController(sliceName, value, FVConfig.getSlicePort(sliceName))){
-					throw new DuplicateControllerException(value, FVConfig.getSlicePort(sliceName), sliceName, "changed");
+				if (isSecondSliceSharingController(sliceName, value, FVConfig.mongoGetSlicePort(sliceName))){ // getSlicePort(sliceName)
+					throw new DuplicateControllerException(value, FVConfig.mongoGetSlicePort(sliceName), sliceName, "changed"); // getSlicePort(sliceName)
 				}
-				FVConfig.setSliceHost(sliceName, value);
+				FVConfig.mongoSetSliceHost(sliceName, value); // setSliceHost(sliceName, value);
 			}
 			else if (key.equals("controller_port")){
 				// Make sure that there isn't already a slice on this port that uses
 				// the same hostname that this slice uses
-				if (isSecondSliceSharingController(sliceName, FVConfig.getSliceHost(sliceName), Integer.parseInt(value))){
-					throw new DuplicateControllerException(FVConfig.getSliceHost(sliceName),
+				if (isSecondSliceSharingController(sliceName, FVConfig.mongoGetSliceHost(sliceName), Integer.parseInt(value))){ //getSliceHost(sliceName)
+					throw new DuplicateControllerException(FVConfig.mongoGetSliceHost(sliceName), // getSliceHost(sliceName)
 							Integer.parseInt(value), sliceName, "changed");
 				}
 				
-				FVConfig.setSlicePort(sliceName, Integer.valueOf(value));
+				FVConfig.mongoSetSlicePort(sliceName, Integer.valueOf(value)); // setSlicePort(sliceName, Integer.valueOf(value));
 			} else if (key.equals("drop_policy")) {
 				//Set the drop policy when the controller is done, 
 				//either to an exact match of the packet in or to the
 				//flow entry.
-				FVConfig.setSliceDropPolicy(sliceName, value);
+				FVConfig.mongoSetSliceDropPolicy(sliceName, value); // setSliceDropPolicy(sliceName, value);
 			} 
 			else
 				throw new InvalidUserInfoKey("invalid key: " + key
@@ -265,8 +267,8 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 				continue;
 			}
 			try {
-				if(FVConfig.getSliceHost(otherSlice).equalsIgnoreCase(hostname)){
-					if(FVConfig.getSlicePort(otherSlice) == port){
+				if(FVConfig.mongoGetSliceHost(otherSlice).equalsIgnoreCase(hostname)){ //getSliceHost(otherSlice)
+					if(FVConfig.mongoGetSlicePort(otherSlice) == port){ //getSlicePort(sliceName)
 						return true;
 					}
 				}
@@ -433,7 +435,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 			FlowMap flowSpace = FlowSpaceUtil.deleteFlowSpaceBySlice(sliceName);
 			try {
 				// this is also synchronized against FVConfig.class
-				FVConfig.deleteSlice(sliceName);
+				FVConfig.mongoDeleteSlice(sliceName); // deleteSlice(sliceName);
 			} catch (Exception e) {
 				throw new SliceNotFound("slice does not exist: " + sliceName);
 			}
@@ -468,7 +470,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		synchronized (FVConfig.class) {
 			try {
 				// this is synchronized
-				List<String> entries = FVConfig.getAllSlices();
+				List<String> entries = FVConfig.mongoGetAllSlices(); // getAllSlices();
 				slices = new LinkedList<String>(entries);
 			} catch (ConfigError e) {
 				e.printStackTrace();
@@ -498,13 +500,11 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 
 		synchronized (FVConfig.class) {
 			try {
-				map.put("contact_email",
-						FVConfig.getSliceEmail(sliceName));
-				map.put("controller_hostname",
-						FVConfig.getSliceHost(sliceName));
-				map.put("controller_port", String.valueOf(FVConfig.getSlicePort(sliceName)));
-				map.put("creator", FVConfig.getSliceCreator(sliceName));
-				map.put("drop_policy", FVConfig.getSlicePolicy(sliceName));
+				map.put("contact_email",FVConfig.mongoGetSliceEmail(sliceName)); // getSliceEmail(sliceName)
+				map.put("controller_hostname", FVConfig.mongoGetSliceHost(sliceName)); // getSliceHost(sliceName));
+				map.put("controller_port", String.valueOf(FVConfig.mongoGetSlicePort(sliceName))); //getSlicePort(sliceName)
+				map.put("creator", FVConfig.mongoGetSliceCreator(sliceName)); // getSliceCreator(sliceName);
+				map.put("drop_policy", FVConfig.mongoGetSlicePolicy(sliceName)); // getSlicePolicy(sliceName));
 			} catch (ConfigError e) {
 				FVLog.log(LogLevel.CRIT, null, "malformed slice: " + e);
 				e.printStackTrace();
@@ -539,12 +539,14 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 
 	/*
 	 * @return true if slice exists, otherwise false
-	 * @param sliceName name of slice to check for existance
+	 * @param sliceName name of slice to check for existence
 	 */
 	public static boolean doesSliceExist(String sliceName){
+		String mongo;
 		List<String> slices = new ArrayList<String>();
 		try {
-			slices = FVConfig.getAllSlices();
+			//slices = FVConfig.getAllSlices();
+			slices = FVConfig.mongoGetAllSlices();
 		} catch (ConfigError e) {
 			e.printStackTrace();
 		}
@@ -778,7 +780,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		FVLog.log(LogLevel.DEBUG, null, "Setting flood perm for : ", dpidStr);
 		long dpid = FlowSpaceUtil.parseDPID(dpidStr);
 		try {
-			SwitchImpl.getProxy().setFloodPerm(dpid, floodPerm);
+			SwitchImpl.getProxy().mongoSetFloodPerm(dpid, floodPerm); // setFloodPerm(dpid, floodPerm);
 			return true;
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.ALERT, null, "Unable to set floodperm", e.getMessage());
@@ -797,7 +799,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		FVLog.log(LogLevel.DEBUG, null, "Setting flood perm for : ", dpidStr);
 		long dpid = FlowSpaceUtil.parseDPID(dpidStr);
 		try {
-			return SwitchImpl.getProxy().getFloodPerm(dpid);
+			return SwitchImpl.getProxy().mongoGetFloodPerm(dpid); // getFloodPerm(dpid);
 			
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.ALERT, null, "Unable to set floodperm", e.getMessage());
@@ -815,7 +817,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 					+ floodPerm);
 		FVLog.log(LogLevel.DEBUG, null, "Setting default flood perm to " + floodPerm);
 		
-		FlowvisorImpl.getProxy().setFloodPerm(floodPerm);
+		FlowvisorImpl.getProxy().mongoSetFloodPerm(floodPerm); // setFloodPerm(floodPerm);
 		return true;
 		
 	}
@@ -829,7 +831,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		FVLog.log(LogLevel.DEBUG, null, "Getting default flood perm");
 		
 		try {
-			return FlowvisorImpl.getProxy().getFloodPerm();
+			return FlowvisorImpl.getProxy().mongoGetFloodPerm(); // getFloodPerm();
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.ALERT, null, "Unable to get floodperm", e.getMessage());
 		}
@@ -851,9 +853,9 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 					" for dpid " + dpid + " to " + maxFlowMods);
 		try {
 			if (dp == FlowEntry.ALL_DPIDS)
-				SliceImpl.getProxy().setMaxFlowMods(sliceName, limit);
+				SliceImpl.getProxy().mongoSetMaxFlowMods(sliceName, limit); // setMaxFlowMods(sliceName, limit);
 			else
-				SwitchImpl.getProxy().setMaxFlowMods(sliceName, dp, limit);
+				SwitchImpl.getProxy().mongoSetMaxFlowMods(sliceName, dp, limit); // setMaxFlowMods(sliceName, dp, limit);
 		} catch (ConfigError e) {
 			return false;
 		}
@@ -872,9 +874,9 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		Long dp = FlowSpaceUtil.parseDPID(dpid);
 		try {
 			if (dp == FlowEntry.ALL_DPIDS)
-				return SliceImpl.getProxy().getMaxFlowMods(sliceName);
+				return SliceImpl.getProxy().mongoGetMaxFlowMods(sliceName); // getMaxFlowMods(sliceName);
 			else
-				return SwitchImpl.getProxy().getMaxFlowMods(sliceName, dp);
+				return SwitchImpl.getProxy().mongoGetMaxFlowMods(sliceName, dp); // getMaxFlowMods(sliceName, dp);
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.DEBUG, null, "Unable to get flow mod limit; " + e.getMessage());
 			return null;
@@ -906,7 +908,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 		int limit = Integer.parseInt(rate);
 		for (FVClassifier classifier : getAllClassifiers()) {
 			try {
-				SwitchImpl.getProxy().setRateLimit(sliceName, classifier.getDPID(), limit);
+				SwitchImpl.getProxy().mongoSetRateLimit(sliceName, classifier.getDPID(), limit); //setRateLimit(sliceName, classifier.getDPID(), limit);
 			} catch (ConfigError e) {
 				FVLog.log(LogLevel.DEBUG, null, "Unable to set rate limit; " + e.getMessage());
 				return false;
@@ -930,7 +932,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 					+ " does not have perms to enable or disable flow tracking");
 		boolean track = Boolean.parseBoolean(flowtracking);
 		FVLog.log(LogLevel.DEBUG, null, "Setting flow tracking to " + (track ? "enabled." : "disabled."));
-		FlowvisorImpl.getProxy().settrack_flows(track);
+		FlowvisorImpl.getProxy().mongoSetTrackFlows(track); // settrack_flows(track);
 		return true;
 	}
 
@@ -945,7 +947,7 @@ public class FVUserAPIImpl /*extends BasicJSONRPCService*/ implements FVUserAPI 
 					+ " does not have perms to obtain flow tracking status");
 		FVLog.log(LogLevel.DEBUG, null, "Getting flow tracking status");
 		try {
-			return FlowvisorImpl.getProxy().gettrack_flows();
+			return FlowvisorImpl.getProxy().mongoGetTrackFlows(); // gettrack_flows();
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.ALERT, null, "Unable to get flow tracking status ", e.getMessage());
 		}

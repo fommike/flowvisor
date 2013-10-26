@@ -171,7 +171,7 @@ public class FVClassifier implements FVEventHandler, FVSendMsg, FlowMapChangedLi
 		
 		// need to initialize values.
 		try {
-			setFlowTracking(FlowvisorImpl.getProxy().gettrack_flows());
+			setFlowTracking(FlowvisorImpl.getProxy().mongoGetTrackFlows()); //gettrack_flows()
 		} catch (ConfigError e) {
 			setFlowTracking(false);
 		}
@@ -316,14 +316,14 @@ public class FVClassifier implements FVEventHandler, FVSendMsg, FlowMapChangedLi
 		this.keepAlive.scheduleNextCheck();
 
 		try {
-			this.wantStatsDescHack = FVConfig.getStatsDescHack();
+			this.wantStatsDescHack = FVConfig.mongoGetStatsDescHack(); // getStatsDescHack()
 			FlowvisorImpl.addListener(this);
 		} catch (ConfigError e) {
 			try {
 				FVLog.log(LogLevel.WARN, this, "config: stats_desc_hack "
 						+ " not set; defaulting to off");
 				this.wantStatsDescHack = false;
-				FVConfig.setStatsDescHack(false);
+				FVConfig.mongoSetStatsDescHack(false); // setStatsDescHack(false);
 			} catch (ConfigError e1) {
 				throw new RuntimeException("Tried to set default "
 						+ "stats_desc_hack=true, but got: " + e1);
@@ -348,7 +348,7 @@ public class FVClassifier implements FVEventHandler, FVSendMsg, FlowMapChangedLi
 		try {
 			/*String entry = FVConfig.SWITCHES + FVConfig.FS + dpid + FVConfig.FS
 				+ FVConfig.FLOOD_PERM;*/
-			String perm = FVConfig.getFloodPerm(dpid);
+			String perm = FVConfig.mongoGetFloodPerm(dpid); //getFloodPerm(dpid);
 			if (!perm.equals(""))
 				this.floodPermsSlice = perm;
 			FVLog.log(LogLevel.DEBUG, this, "giving flood perms to slice: "
@@ -960,7 +960,7 @@ public class FVClassifier implements FVEventHandler, FVSendMsg, FlowMapChangedLi
 	public void loadLimit(String sliceName) {
 		int limit = -1;
 		try {
-			limit = SwitchImpl.getProxy().getMaxFlowMods(sliceName, this.getDPID());
+			limit = SwitchImpl.getProxy().mongoGetMaxFlowMods(sliceName, this.getDPID()); // getMaxFlowMods(sliceName, this.getDPID());
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.WARN, this, "Disabling dpid limits because I can't load it from the db.");
 		}
@@ -970,7 +970,7 @@ public class FVClassifier implements FVEventHandler, FVSendMsg, FlowMapChangedLi
 	public void loadRateLimit(String sliceName) {
 		int limit = -1;
 		try {
-			limit = SwitchImpl.getProxy().getRateLimit(sliceName, this.getDPID());
+			limit = SwitchImpl.getProxy().mongoGetRateLimit(sliceName, this.getDPID()); //getRateLimit(sliceName, this.getDPID());
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.WARN, this, "Disabling dpid limits because I can't load it from the db.");
 		}

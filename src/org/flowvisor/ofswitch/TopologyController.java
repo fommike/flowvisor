@@ -90,8 +90,8 @@ public class TopologyController extends OFSwitchAcceptor {
 			tc = new TopologyController(pollLoop, 0, 16); // 0 == any port
 			int port = tc.getListenPort();
 			try {
-				FVConfig.setSliceHost(TopoUser, "localhost");
-				FVConfig.setSlicePort(TopoUser, port);
+				FVConfig.mongoSetSliceHost(TopoUser, "localhost"); // setSliceHost(TopoUser, "localhost");
+				FVConfig.mongoSetSlicePort(TopoUser, port);	// setSlicePort(TopoUser, port);
 			} catch (ConfigError e) {
 				FVLog.log(LogLevel.CRIT, tc,
 						"tried to register topology controller info, but topo user '"
@@ -319,12 +319,12 @@ public class TopologyController extends OFSwitchAcceptor {
 
 	public static boolean isConfigured() {
 		try {
-			return FVConfig.getTopologyServer();
+			return FVConfig.mongoGetTopologyServer(); // getTopologyServer();
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.WARN, null, "Creating config entry for topology server run parameter"
 					+ "=false");
 			try {
-				FVConfig.setTopologyServer(false);
+				FVConfig.mongoSetTopologyServer(false); // setTopologyServer(false);
 			} catch (ConfigError e1) {
 				throw new RuntimeException(e1);
 			}

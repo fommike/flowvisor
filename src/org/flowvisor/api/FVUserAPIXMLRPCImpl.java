@@ -66,7 +66,8 @@ public class FVUserAPIXMLRPCImpl extends FVUserAPIImpl implements FVUserAPIXML{
 		synchronized (FVConfig.class) { // prevent multiple API clients from
 			// stomping
 			// on each other
-			FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			//FlowMap flowSpace = FVConfig.getFlowSpaceFlowMap();
+			FlowMap flowSpace = FVConfig.mongoGetFlowSpaceFlowMap();
 				
 			String logMsg;
 			for (int i = 0; i < changes.size(); i++) {
@@ -89,7 +90,7 @@ public class FVUserAPIXMLRPCImpl extends FVUserAPIImpl implements FVUserAPIXML{
 					FlowEntry flowEntry = new FlowEntry(change.getDpid(),
 							change.getMatch(), change.getPriority(),
 							change.getActions());
-					flowEntry.setId(FlowSpaceImpl.getProxy().addRule(flowEntry));
+					flowEntry.setId(FlowSpaceImpl.getProxy().mongoAddRule(flowEntry)); //addRule(flowEntry)
 
 					if (operation == FlowChangeOp.ADD)
 						returnIDs.add(String.valueOf(flowEntry.getId()));

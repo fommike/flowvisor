@@ -61,7 +61,7 @@ public class AnyLogger extends Syslog4jAppenderSkeleton implements FVLogInterfac
 			this.protocol = UDP;
 		
 		try {
-			String fac = FVConfig.getLogFacility();
+			String fac = FVConfig.mongoGetLogFacility(); // getLogFacility
 			this.facility = fac;
 			if (this.facility == null) {
 				this.facility = DEFAULT_LOGGING_FACILITY;
@@ -71,7 +71,8 @@ public class AnyLogger extends Syslog4jAppenderSkeleton implements FVLogInterfac
 			}
 		} catch (Exception e) {
 			try {
-				FVConfig.setLogFacility(DEFAULT_LOGGING_FACILITY);
+				// setLogFacility(DEFAULT_LOGGING_FACILITY);
+				FVConfig.mongoSetLogFacility(DEFAULT_LOGGING_FACILITY);
 				this.facility = DEFAULT_LOGGING_FACILITY;
 			} catch (ConfigError e1) {
 				System.err.println("Failed to set logging facility"
@@ -80,10 +81,10 @@ public class AnyLogger extends Syslog4jAppenderSkeleton implements FVLogInterfac
 
 		}
 		try {
-			this.ident = FVConfig.getLogIdent();
+			this.ident = FVConfig.mongoGetLogIdent(); // getLogIdent();
 		} catch (Exception e) {
 			try {
-				FVConfig.setLogIdent(DEFAULT_LOGGING_IDENT);
+				FVConfig.mongoSetLogIdent(DEFAULT_LOGGING_IDENT); // setLogIdent(DEFAULT_LOGGING_IDENT);
 				this.ident = DEFAULT_LOGGING_IDENT;
 			} catch (ConfigError e1) {
 				System.err.println("Failed to set logging identifier " 

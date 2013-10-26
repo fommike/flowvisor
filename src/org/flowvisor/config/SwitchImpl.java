@@ -1,6 +1,7 @@
 package org.flowvisor.config;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,6 +18,14 @@ import org.flowvisor.log.FVLog;
 import org.flowvisor.log.LogLevel;
 import org.flowvisor.openflow.protocol.FVMatch;
 import org.openflow.protocol.OFFlowMod;
+
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
+import com.mongodb.WriteResult;
 
 public class SwitchImpl implements Switch {
 
@@ -109,6 +118,43 @@ public class SwitchImpl implements Switch {
 		}
 		return null;
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public String mongoGetFloodPerm(Long dpid) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject switchQuery = new BasicDBObject();
+			BasicDBObject switchMatch = new BasicDBObject("$elemMatch", new BasicDBObject(DPID, dpid));
+			BasicDBObject switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+		
+			DBCursor switchSelect = flowvisorColl.find(switchQuery, switchFields);
+			
+			try {
+				while (switchSelect.hasNext()) {
+					ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) switchSelect.next().get(TSWITCH);
+					if (queryResult == null) 
+						throw new ConfigError("Flood perm not found!");
+					for (BasicDBObject switchList: queryResult) {
+						return switchList.get(FLOOD).toString();
+					}
+				}
+			} finally {
+				switchSelect.close();
+			}
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return null;
+	}
 
 	@Override
 	public void setFloodPerm(Long dpid, String flood_perm) throws ConfigError{
@@ -132,11 +178,35 @@ public class SwitchImpl implements Switch {
 			close(ps);
 			close(conn);	
 		}	
-
 	}
 	
 	@Override
-	public Integer getMaxFlowMods(String sliceName, Long dp) throws ConfigError {
+	public void mongoSetFloodPerm(Long dpid, String flood_perm) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = TSWITCH + "." + DPID;
+		String updateField = TSWITCH + ".$." + FLOOD;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			BasicDBObject switchQuery = new BasicDBObject(queryCondition, dpid);
+			BasicDBObject switchUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, flood_perm));
+			flowvisorColl.update(switchQuery, switchUpdate);
+
+			notify(dpid, FFLOOD, flood_perm);
+			
+		} catch (UnknownHostException e) {
+			throw new ConfigError("Unable to set flood permission for dpid " + dpid);
+		} 
+	}
+	
+	@Override
+	public Integer getMaxFlowMods(String sliceName, Long dpid) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
 		ResultSet set = null;
@@ -144,7 +214,7 @@ public class SwitchImpl implements Switch {
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(GLIMIT);
 			ps.setString(1, sliceName);
-			ps.setLong(2, dp);
+			ps.setLong(2, dpid);
 			set = ps.executeQuery();
 			if (set.next())
 				return set.getInt(FMLIMIT);
@@ -155,6 +225,87 @@ public class SwitchImpl implements Switch {
 			close(ps);
 			close(conn);	
 		}
+		return -1;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Integer mongoGetMaxFlowMods(String sliceName, Long dpid) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			// Check if the slice name exists
+			BasicDBObject searchQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(Slice.SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(Slice.TSLICE, sliceMatch).append("_id", false); 
+				
+			DBCursor sliceSelect = flowvisorColl.find(searchQuery, sliceFields);
+			
+			if (sliceSelect.next().get(Slice.TSLICE) == null)
+				throw new ConfigError("Unknown slice " + sliceName);
+			
+			// Check if dpid exists 
+			BasicDBObject switchMatch = new BasicDBObject("$elemMatch", new BasicDBObject(DPID, dpid));
+			BasicDBObject switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+		
+			DBCursor switchSelect = flowvisorColl.find(searchQuery, switchFields);
+			
+			if (switchSelect.next().get(TSWITCH) != null) {
+				
+				String clauseCondition1 = DPID;
+				String clauseCondition2 = LIMITS + "." + sliceName; 
+			
+				BasicDBObject queryClasue1 = new BasicDBObject(clauseCondition1, dpid);
+				BasicDBObject queryClasue2 = new BasicDBObject(clauseCondition2, new BasicDBObject("$exists", true));
+				
+				BasicDBList compositeQuery = new BasicDBList();
+				compositeQuery.add(queryClasue1);
+				compositeQuery.add(queryClasue2);
+				
+				BasicDBObject switchQuery = new BasicDBObject("$and", compositeQuery);
+				switchMatch = new BasicDBObject("$elemMatch", switchQuery);
+				switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+				
+				switchSelect = flowvisorColl.find(searchQuery, switchFields);
+
+				if (switchSelect.copy().next().get(TSWITCH) != null) {
+					
+					try {
+						while (switchSelect.hasNext()) {
+							ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) switchSelect.next().get(TSWITCH);
+							for (BasicDBObject switchList: queryResult) {
+								if (switchList.get(LIMITS) != null) {
+									BasicDBObject limitList = (BasicDBObject) switchList.get(LIMITS);
+									Integer maxFlowMods = (Integer) ((BasicDBObject)limitList.get(sliceName)).get(FMLIMIT);
+									if (maxFlowMods == null)
+										return -1;
+									else
+										return maxFlowMods;
+								} else 
+									throw new ConfigError("No limits found in switch with dpid " + dpid);
+							}
+						}
+					} finally {
+						switchSelect.close();
+					}
+				} else {
+					throw new ConfigError("There is no limit " + sliceName + " for switch with dpid " + dpid);
+				}
+			} else {
+				throw new ConfigError("Unknown switch with dpid " + dpid);
+			}
+			sliceSelect.close();
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
 		return -1;
 	}
 
@@ -224,11 +375,141 @@ public class SwitchImpl implements Switch {
 			close(ps);
 			close(conn);	
 		}
-		
 	}
 	
 	@Override
-	public Integer getRateLimit(String sliceName, Long dp) throws ConfigError {
+	public void mongoSetMaxFlowMods(String sliceName, Long dpid, int limit) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = null;
+		String updateField = null;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			// Check if the slice name exists
+			BasicDBObject searchQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(Slice.SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(Slice.TSLICE, sliceMatch).append("_id", false); 
+				
+			DBCursor sliceSelect = flowvisorColl.find(searchQuery, sliceFields);
+			
+			if (sliceSelect.next().get(Slice.TSLICE) == null)
+				throw new ConfigError("Unknown slice " + sliceName);
+			
+			// Check if dpid exists 
+			BasicDBObject switchMatch = new BasicDBObject("$elemMatch", new BasicDBObject(DPID, dpid));
+			BasicDBObject switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+		
+			DBCursor switchSelect = flowvisorColl.find(searchQuery, switchFields);
+				
+			if (switchSelect.next().get(TSWITCH) == null) {
+				
+				//System.out.println("Switch with dpid " + dpid + " does not exist!");
+				updateField = TSWITCH;
+				
+				BasicDBObject switchSet = new BasicDBObject();
+				BasicDBObject sliceLimitSet = new BasicDBObject();
+				sliceLimitSet.put(FMLIMIT, limit);
+				BasicDBObject sliceLimit = new BasicDBObject(sliceName, sliceLimitSet);
+			
+				switchSet.put(LIMITS, sliceLimit);
+				switchSet.put(FLOOD, "");
+				switchSet.put(DPDESC, "");
+				switchSet.put(MFRDESC, "");
+				switchSet.put(HWDESC, "");
+				switchSet.put(SERIAL, "");
+				switchSet.put(DPID, dpid);
+				switchSet.put(CAPA, -1);
+				switchSet.put(SWDESC, "");
+				
+				BasicDBObject switchQuery = new BasicDBObject();
+				BasicDBObject switchUpdate = new BasicDBObject("$push", new BasicDBObject(updateField, switchSet));
+				
+				flowvisorColl.update(switchQuery, switchUpdate);
+
+			} else {
+				
+				//System.out.println("We have switch with dpid " + dpid);
+				String clauseCondition1 = DPID;
+				String clauseCondition2 = LIMITS + "." + sliceName; 
+				queryCondition = TSWITCH + "." + DPID;
+				
+				BasicDBObject queryClasue1 = new BasicDBObject(clauseCondition1, dpid);
+				BasicDBObject queryClasue2 = new BasicDBObject(clauseCondition2, new BasicDBObject("$exists", true));
+				
+				BasicDBList compositeQuery = new BasicDBList();
+				compositeQuery.add(queryClasue1);
+				compositeQuery.add(queryClasue2);
+				
+				BasicDBObject switchQuery = new BasicDBObject("$and", compositeQuery);
+				switchMatch = new BasicDBObject("$elemMatch", switchQuery);
+				switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+				
+				switchSelect = flowvisorColl.find(searchQuery, switchFields);
+	
+				if (switchSelect.next().get(TSWITCH) != null) {
+			
+					// Update existing field
+					updateField = TSWITCH + ".$." + LIMITS + "." + sliceName + "." + FMLIMIT;
+					
+					switchQuery = new BasicDBObject(queryCondition, dpid);
+					BasicDBObject switchUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, limit));
+					flowvisorColl.update(switchQuery, switchUpdate);
+					
+				} else {
+					
+					// Add new field
+					updateField = TSWITCH + ".$." + LIMITS + "." + sliceName;
+					
+					BasicDBObject sliceLimitSet = new BasicDBObject();
+					sliceLimitSet.put(FMLIMIT, limit);
+					
+					switchQuery = new BasicDBObject(queryCondition, dpid);
+					BasicDBObject switchUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, sliceLimitSet));
+					flowvisorColl.update(switchQuery, switchUpdate);
+				}
+			
+				/*
+				// Just for debugging purposes
+				BasicDBObject switchQuery1 = new BasicDBObject("$and", compositeQuery);
+				BasicDBObject searchQuery1 = new BasicDBObject();
+				BasicDBObject switchMatch1 = new BasicDBObject("$elemMatch", switchQuery1);
+				//BasicDBObject switchMatch1 = new BasicDBObject("$elemMatch", new BasicDBObject(LIMITS + "." + sliceName, new BasicDBObject("$exists", true)));
+				BasicDBObject switchFields1 = new BasicDBObject(TSWITCH, switchMatch1).append("_id", false); 
+				
+				DBCursor switchSelect1 = flowvisorColl.find(searchQuery1, switchFields1);
+
+				try {
+					while (switchSelect1.hasNext()) {
+						System.out.println(switchSelect1.next());
+					}
+				} finally {
+					switchSelect1.close();
+				}
+				*/
+			}
+			
+			sliceSelect.close();
+			switchSelect.close();
+			
+			HashMap<String, Object> values = new HashMap<String, Object>();
+			values.put(Slice.SLICE, sliceName);
+			values.put("LIMIT", limit);
+			notify(dpid, FFMLIMIT, values);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+	}
+	
+	@Override
+	public Integer getRateLimit(String sliceName, Long dpid) throws ConfigError {
 		Connection conn = null;
 		PreparedStatement ps = null;
 		ResultSet set = null;
@@ -236,7 +517,7 @@ public class SwitchImpl implements Switch {
 			conn = settings.getConnection();
 			ps = conn.prepareStatement(GRATELIMIT);
 			ps.setString(1, sliceName);
-			ps.setLong(2, dp);
+			ps.setLong(2, dpid);
 			set = ps.executeQuery();
 			if (set.next())
 				return set.getInt(RATELIMIT);
@@ -249,6 +530,88 @@ public class SwitchImpl implements Switch {
 		}
 		return -1;
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Integer mongoGetRateLimit(String sliceName, Long dpid) throws ConfigError {
+		
+		String mongo;
+		
+		String Flowvisor = "Flowvisor";
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			// Check if the slice name exists
+			BasicDBObject searchQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(Slice.SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(Slice.TSLICE, sliceMatch).append("_id", false); 
+				
+			DBCursor sliceSelect = flowvisorColl.find(searchQuery, sliceFields);
+			
+			if (sliceSelect.next().get(Slice.TSLICE) == null)
+				throw new ConfigError("Unknown slice " + sliceName);
+			
+			// Check if dpid exists 
+			BasicDBObject switchMatch = new BasicDBObject("$elemMatch", new BasicDBObject(DPID, dpid));
+			BasicDBObject switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+		
+			DBCursor switchSelect = flowvisorColl.find(searchQuery, switchFields);
+			
+			if (switchSelect.next().get(TSWITCH) != null) {
+				
+				String clauseCondition1 = DPID;
+				String clauseCondition2 = LIMITS + "." + sliceName; 
+			
+				BasicDBObject queryClasue1 = new BasicDBObject(clauseCondition1, dpid);
+				BasicDBObject queryClasue2 = new BasicDBObject(clauseCondition2, new BasicDBObject("$exists", true));
+				
+				BasicDBList compositeQuery = new BasicDBList();
+				compositeQuery.add(queryClasue1);
+				compositeQuery.add(queryClasue2);
+				
+				BasicDBObject switchQuery = new BasicDBObject("$and", compositeQuery);
+				switchMatch = new BasicDBObject("$elemMatch", switchQuery);
+				switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+				
+				switchSelect = flowvisorColl.find(searchQuery, switchFields);
+
+				if (switchSelect.copy().next().get(TSWITCH) != null) {
+					
+					try {
+						while (switchSelect.hasNext()) {
+							ArrayList<BasicDBObject> queryResult = (ArrayList<BasicDBObject>) switchSelect.next().get(TSWITCH);
+							for (BasicDBObject switchList: queryResult) {
+								if (switchList.get(LIMITS) != null) {
+									BasicDBObject limitList = (BasicDBObject) switchList.get(LIMITS);
+									Integer rateLimit = (Integer) ((BasicDBObject)limitList.get(sliceName)).get(RATELIMIT);
+									if (rateLimit == null)
+										return -1;
+									else
+										return rateLimit;
+								} else 
+									throw new ConfigError("No limits found for switch with dpid " + dpid);
+							}
+						}
+					} finally {
+						switchSelect.close();
+					}
+				} else {
+					throw new ConfigError("There is no limit " + sliceName + " for switch with dpid " + dpid);
+				}
+			} else {
+				throw new ConfigError("Unknown switch with dpid " + dpid);
+			}
+			sliceSelect.close();
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
+		} 
+		return -1;
+	}
+	
 	
 	public void setRateLimit(String sliceName, Long dpid, int rate) throws ConfigError {
 		Connection conn = null;
@@ -263,7 +626,7 @@ public class SwitchImpl implements Switch {
 			if (set.next())
 				sliceid = set.getInt("id");
 			else 
-				throw new ConfigError("Unknown slice " + sliceName);
+				throw new ConfigError("Unknown slice 111 " + sliceName);
 			ps = conn.prepareStatement(GSWITCHID);
 			ps.setLong(1, dpid);
 			set = ps.executeQuery();
@@ -313,6 +676,118 @@ public class SwitchImpl implements Switch {
 			close(set);
 			close(ps);
 			close(conn);	
+		}
+	}
+	
+	@Override
+	public void mongoSetRateLimit(String sliceName, Long dpid, int rate) throws ConfigError {
+		
+		String mongo;
+		String Flowvisor = "Flowvisor";
+		String queryCondition = null;
+		String updateField = null;
+		DB conn = null;
+		DBCollection flowvisorColl = null;
+		
+		try {
+			
+			conn = settings.getMongoConnection();
+			flowvisorColl = conn.getCollection(Flowvisor);
+			
+			// Check if the slice name exists
+			BasicDBObject searchQuery = new BasicDBObject();
+			BasicDBObject sliceMatch = new BasicDBObject("$elemMatch", new BasicDBObject(Slice.SLICE, sliceName));
+			BasicDBObject sliceFields = new BasicDBObject(Slice.TSLICE, sliceMatch).append("_id", false); 
+				
+			DBCursor sliceSelect = flowvisorColl.find(searchQuery, sliceFields);
+			
+			if (sliceSelect.next().get(Slice.TSLICE) == null)
+				throw new ConfigError("Unknown slice " + sliceName);
+			
+			// Check if dpid exists 
+			BasicDBObject switchMatch = new BasicDBObject("$elemMatch", new BasicDBObject(DPID, dpid));
+			BasicDBObject switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+		
+			DBCursor switchSelect = flowvisorColl.find(searchQuery, switchFields);
+				
+			if (switchSelect.next().get(TSWITCH) == null) {
+				
+				//System.out.println("Switch with dpid " + dpid + " does not exist!");
+				updateField = TSWITCH;
+				
+				BasicDBObject switchSet = new BasicDBObject();
+				BasicDBObject sliceLimitSet = new BasicDBObject();
+				sliceLimitSet.put(RATELIMIT, rate);
+				BasicDBObject sliceLimit = new BasicDBObject(sliceName, sliceLimitSet);
+			
+				switchSet.put(LIMITS, sliceLimit);
+				switchSet.put(FLOOD, "");
+				switchSet.put(DPDESC, "");
+				switchSet.put(MFRDESC, "");
+				switchSet.put(HWDESC, "");
+				switchSet.put(SERIAL, "");
+				switchSet.put(DPID, dpid);
+				switchSet.put(CAPA, -1);
+				switchSet.put(SWDESC, "");
+				
+				BasicDBObject switchQuery = new BasicDBObject();
+				BasicDBObject switchUpdate = new BasicDBObject("$push", new BasicDBObject(updateField, switchSet));
+				
+				flowvisorColl.update(switchQuery, switchUpdate);
+
+			} else {
+				
+				//System.out.println("We have switch with dpid " + dpid);
+				String clauseCondition1 = DPID;
+				String clauseCondition2 = LIMITS + "." + sliceName; 
+				queryCondition = TSWITCH + "." + DPID;
+				
+				BasicDBObject queryClasue1 = new BasicDBObject(clauseCondition1, dpid);
+				BasicDBObject queryClasue2 = new BasicDBObject(clauseCondition2, new BasicDBObject("$exists", true));
+				
+				BasicDBList compositeQuery = new BasicDBList();
+				compositeQuery.add(queryClasue1);
+				compositeQuery.add(queryClasue2);
+				
+				BasicDBObject switchQuery = new BasicDBObject("$and", compositeQuery);
+				switchMatch = new BasicDBObject("$elemMatch", switchQuery);
+				switchFields = new BasicDBObject(TSWITCH, switchMatch).append("_id", false); 
+				
+				switchSelect = flowvisorColl.find(searchQuery, switchFields);
+	
+				if (switchSelect.next().get(TSWITCH) != null) {
+			
+					// Update existing field
+					updateField = TSWITCH + ".$." + LIMITS + "." + sliceName + "." + RATELIMIT;
+					
+					switchQuery = new BasicDBObject(queryCondition, dpid);
+					BasicDBObject switchUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, rate));
+					flowvisorColl.update(switchQuery, switchUpdate);
+					
+				} else {
+					
+					// Add new field
+					updateField = TSWITCH + ".$." + LIMITS + "." + sliceName;
+					
+					BasicDBObject sliceLimitSet = new BasicDBObject();
+					sliceLimitSet.put(RATELIMIT, rate);
+					
+					switchQuery = new BasicDBObject(queryCondition, dpid);
+					BasicDBObject switchUpdate = new BasicDBObject("$set", new BasicDBObject(updateField, sliceLimitSet));
+					flowvisorColl.update(switchQuery, switchUpdate);
+				}
+			
+			}
+			sliceSelect.close();
+			switchSelect.close();
+			
+			HashMap<String, Object> values = new HashMap<String, Object>();
+			values.put(Slice.SLICE, sliceName);
+			values.put("RATELIMIT", rate);
+			notify(dpid, FRATELIMIT, values);
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, e.getMessage());
 		}
 	}
 	
@@ -470,8 +945,6 @@ public class SwitchImpl implements Switch {
 		}
 	}
 	
-	
-	
 	@Override
 	public HashMap<String, Object> toJson(HashMap<String, Object> output) {
 		Connection conn = null;
@@ -498,6 +971,7 @@ public class SwitchImpl implements Switch {
 				sws.put(CAPA, set.getInt(CAPA));
 				
 				PreparedStatement limits = conn.prepareStatement(GALLLIMITS);
+				//System.out.println("ID: " + set.getInt("id"));
 				limits.setInt(1, set.getInt("id"));
 				ResultSet limitSet = limits.executeQuery();
 				int columns = limitSet.getMetaData().getColumnCount();
@@ -540,7 +1014,36 @@ public class SwitchImpl implements Switch {
 		}
 		return output;
 	}
-
+	
+	@Override
+	public HashMap<String, Object> mongoToJson(HashMap<String, Object> output) {
+		
+		String mongo;
+		String Switch = "Switch"; // This will go once we have consistency in the naming
+		DB conn = null;
+		DBCollection switchColl = null;
+		LinkedList<Object> list = new LinkedList<Object>();
+		
+		try {
+			conn = settings.getMongoConnection();
+			switchColl = conn.getCollection(Switch);
+		
+			if (switchColl.getCount() != 0) {
+				
+				// This will be a little more tedious, multiple docs included
+				// the collection should be sophisticated to speed up!
+				
+			} else {
+				// Default case
+				output.put("switches", list);
+			}
+			
+		} catch (UnknownHostException e) {
+			FVLog.log(LogLevel.WARN, null, "Failed to write mongo Switch info  : " + e.getMessage());
+		}
+		return output;
+	}
+	
 	@Override
 	public void fromJson(ArrayList<HashMap<String, Object>> list) throws IOException {
 		for (HashMap<String, Object> row : list)
@@ -720,6 +1223,13 @@ public class SwitchImpl implements Switch {
 		if (version == 1) {
 			processAlter("ALTER TABLE jSliceSwitchLimits ADD COLUMN " + RATELIMIT + " INT NOT NULL DEFAULT -1");
 		}
+		
+	}
+
+	@Override
+	public void mongoFromJson(ArrayList<HashMap<String, Object>> input)
+			throws IOException {
+		// TODO Auto-generated method stub
 		
 	}
 	

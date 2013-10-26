@@ -129,7 +129,8 @@ public class FVPacketIn extends OFPacketIn implements Classifiable, Slicable,
 		
 		String drop_policy = null;
 		try {
-			drop_policy = FVConfig.getDropPolicy(sliceName);
+			//drop_policy = FVConfig.getDropPolicy(sliceName);
+			drop_policy = FVConfig.mongoGetDropPolicy(sliceName);
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.ALERT, fvClassifier, "Failed to retrieve drop policy from config."
 					+ "\nDefauting to exact drop_policy");
@@ -242,8 +243,8 @@ public class FVPacketIn extends OFPacketIn implements Classifiable, Slicable,
 
 		System.err.println("Looking up packet '" + packet + "' on dpid="
 				+ FlowSpaceUtil.dpidToString(dpid));
-		List<FlowEntry> entries = FVConfig.getFlowSpaceFlowMap().matches(dpid,
-				packet);
+		//List<FlowEntry> entries = FVConfig.getFlowSpaceFlowMap().matches(dpid, packet);
+		List<FlowEntry> entries = FVConfig.mongoGetFlowSpaceFlowMap().matches(dpid, packet);
 
 		System.err.println("Matches found: " + entries.size());
 		if (entries.size() > 1)

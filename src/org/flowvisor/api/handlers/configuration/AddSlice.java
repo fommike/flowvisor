@@ -59,12 +59,22 @@ public class AddSlice implements ApiHandler<Map<String, Object>> {
 			Boolean status = HandlerUtils.<Boolean>fetchField(ADMINSTATUS, params, false, true);
 			validateSliceName(sliceName);
 			validateDropPolicy(dropPolicy);
+			/*
 			SliceImpl.getProxy().createSlice(sliceName, list[1], ctrlPort, 
 					dropPolicy, password, APIAuth.getSalt(), adminInfo, APIUserCred.getUserName(),
-					lldpOptIn, maxFM.intValue(), 1, FlowMap.type.FEDERATED.ordinal() );
-			for (FVClassifier classifier : HandlerUtils.getAllClassifiers())
-				SwitchImpl.getProxy().setRateLimit(sliceName, classifier.getDPID(), rate.intValue());
-			SliceImpl.getProxy().setAdminStatus(sliceName, status);
+					lldpOptIn, maxFM.intValue(), 1, FlowMap.type.FEDERATED.ordinal());
+			*/
+			///*
+			SliceImpl.getProxy().mongoCreateSlice(sliceName, list[1], ctrlPort, 
+					dropPolicy, password, APIAuth.getSalt(), adminInfo, APIUserCred.getUserName(),
+					lldpOptIn, maxFM.intValue(), FlowMap.type.FEDERATED.ordinal());
+			//*/
+			for (FVClassifier classifier : HandlerUtils.getAllClassifiers()) {
+				//SwitchImpl.getProxy().setRateLimit(sliceName, classifier.getDPID(), rate.intValue());
+				SwitchImpl.getProxy().mongoSetRateLimit(sliceName, classifier.getDPID(), rate.intValue());
+			}
+			//SliceImpl.getProxy().setAdminStatus(sliceName, status);
+			SliceImpl.getProxy().mongoSetAdminStatus(sliceName, status);
 			
 			resp = new JSONRPC2Response(true, 0);
 		} catch (ConfigError e) {
@@ -87,25 +97,22 @@ public class AddSlice implements ApiHandler<Map<String, Object>> {
 					cmdName() + ": " + e.getMessage()), 0);
 		} 
 		return resp;
-		
 	}
-
 
 	private void validateDropPolicy(String dropPolicy) throws InvalidDropPolicy {
 		if (!dropPolicy.equals("exact") && !dropPolicy.equals("rule"))
 			throw new InvalidDropPolicy("Flowvisor currently supports an 'exact'"
-						+" or a 'rule' based drop policy");
-		
+						+" or a 'rule' based drop policy");	
 	}
 
 
 	private void validateSliceName(String sliceName)
 		throws ConfigError, PermissionDeniedException {
-		List<String> slices = FVConfig.getAllSlices();
+		//List<String> slices = FVConfig.getAllSlices();
+		List<String> slices = FVConfig.mongoGetAllSlices();
 		if (slices.contains(sliceName))
 			throw new PermissionDeniedException(
 					"Cannot create slice with existing name.");
-	
 	}
 
 

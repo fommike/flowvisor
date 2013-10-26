@@ -112,7 +112,7 @@ public class FlowVisor {
 	 */
 	public void setPort(int port) {
 		try {
-			FlowvisorImpl.getProxy().setListenPort(port);
+			FlowvisorImpl.getProxy().mongoSetListenPort(port); // setListenPort(port);
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.WARN, null, "Failed to set api port");
 		}
@@ -120,7 +120,7 @@ public class FlowVisor {
 
 	public void setJettyPort(int port){
 		try {
-			FlowvisorImpl.getProxy().setJettyPort(port);
+			FlowvisorImpl.getProxy().mongoSetJettyPort(port); // setJettyPort(port);
 		} catch (ConfigError e) {
 			FVLog.log(LogLevel.WARN, null, "Failed to set jetty port");
 		}
@@ -158,10 +158,12 @@ public class FlowVisor {
 		FVEventLoop pollLoop = new FVEventLoop();
 		sliceLimits = new SlicerLimits();
 		
-		JettyServer.spawnJettyServer(FVConfig.getJettyPort());//jettyPort);
+		JettyServer.spawnJettyServer(FVConfig.mongoGetJettyPort());//jettyPort); //GetJettyPort()
 		
-		if (port == 0)
-			port = FVConfig.getListenPort();
+		if (port == 0) {
+			//port = FVConfig.getListenPort();
+			port = FVConfig.mongoGetListenPort();
+		}
 
 		// init topology discovery, if configured for it
 		if (TopologyController.isConfigured())
@@ -183,11 +185,11 @@ public class FlowVisor {
 		// print some system state
 		boolean flowdb = false;
 		try {
-			if (FVConfig.getFlowTracking())
+			if (FVConfig.mongoGetFlowTracking()) // getFlowTracking()
 				flowdb = true;
 		} catch (ConfigError e) {
 			// assume off if not set
-			FVConfig.setFlowTracking(false);
+			FVConfig.mongoSetFlowTracking(false); // setFlowTracking(false);
 			this.checkPointConfig();
 		}
 		if (!flowdb)
@@ -399,7 +401,7 @@ public class FlowVisor {
 
 		// do we want checkpointing?
 		try {
-			if (!FVConfig.getCheckPoint())
+			if (!FVConfig.mongoGetCheckPoint()) // getCheckPoint
 				return;
 		} catch (ConfigError e1) {
 			FVLog.log(LogLevel.WARN, null,
